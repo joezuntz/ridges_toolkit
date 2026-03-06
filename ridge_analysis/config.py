@@ -44,6 +44,7 @@ class SegmentationConfig:
     ridge_point_file: str
     ridge_file: str
     density_percentile: float = 0.0
+    mst_neighbours: int = 10
 
 
 @dataclasses.dataclass(kw_only=True)

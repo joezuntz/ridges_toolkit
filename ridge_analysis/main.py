@@ -1,15 +1,4 @@
-# import os
 import numpy as np
-# import pandas as pd
-import h5py
-# import time
-# from scipy.spatial import KDTree
-# from sklearn.neighbors import NearestNeighbors
-# import matplotlib.pyplot as plt
-# 
-# import astropy.units as u
-# import dredge
-import healpy as hp
 from ridge_analysis.shear import measure_shear
 from .io import RidgeSegmentCatalog, LensCatalog, SourceCatalog, RidgePointCatalog
 from .config import DredgeConfig, SegmentationConfig, ShearConfig
@@ -21,12 +10,13 @@ from .config import DredgeConfig, SegmentationConfig, ShearConfig
 
 ##############################################################
 
-def locate_ridge_points(lens_catalog: LensCatalog, dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
+def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
     from .. import dredge
     # In Dredge every rank needs the whole catalog, and the splitting is done
     # over the mesh points. We could certainly improve this if needed by giving
     # each rank only the lens catalog nearby its mesh points, but for now we
     # just load the whole catalog on every rank.
+    lens_catalog = LensCatalog(dredge_config.lens_catalog_file)
     lens_catalog.load(comm=comm, split_over_ranks=False)
 
     # Apply any redshift cuts
@@ -60,9 +50,13 @@ def locate_ridge_points(lens_catalog: LensCatalog, dredge_config: DredgeConfig, 
     return output
 
 
-def segment_ridges(ridge_point_catalog: RidgePointCatalog, segmentation_config: SegmentationConfig) -> RidgeSegmentCatalog:
+def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatalog:
     from .segmentation import build_mst, detect_branch_points, split_mst_at_branches, segment_filaments_with_dbscan
 
+
+    # If the catalog is already loaded this will do nothing, otherwise it will load the data from disk.
+    # Ridge segmentation is very fast, so we don't parallelize this step.
+    ridge_point_catalog = RidgePointCatalog(segmentation_config.ridge_point_file)
     ridge_point_catalog.load()
 
     # Apply density cut if specified
@@ -74,7 +68,7 @@ def segment_ridges(ridge_point_catalog: RidgePointCatalog, segmentation_config: 
 
     ridges = ridge_point_catalog.dec_ra_in_radians()
 
-    mst = build_mst(ridges)
+    mst = build_mst(ridges, k=segmentation_config.mst_neighbours)
     branch_points = detect_branch_points(mst)
     filament_segments = split_mst_at_branches(mst, branch_points)
     filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
@@ -87,7 +81,7 @@ def segment_ridges(ridge_point_catalog: RidgePointCatalog, segmentation_config: 
     return output
 
 def measure_ridge_shear(ridge_segments: RidgeSegmentCatalog, source_catalog: SourceCatalog, shear_config: ShearConfig):
-    # --- Shear calculations ---
+    ridge_segments.load()
 
     shear_table = measure_shear(ridge_segments,
                   source_catalog,
@@ -105,5 +99,6 @@ def measure_ridge_shear(ridge_segments: RidgeSegmentCatalog, source_catalog: Sou
     )
 
     shear_table.save(shear_config.output_shear_file)
+    return shear_table
 
 

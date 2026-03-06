@@ -21,7 +21,7 @@ def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
     return phi
 
 
-def precompute_pixel_regions(ras, decs, g1, g2, z, weights, nside_coverage):
+def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
     """
     Split up the source catalot into low-resolution healpix pixels for fast lookup later on.
 
@@ -57,7 +57,7 @@ def precompute_pixel_regions(ras, decs, g1, g2, z, weights, nside_coverage):
     # This takes < 1 minute
     for j, i in enumerate(np.unique(source_healpix_low_res)):
         index = np.where(source_healpix_low_res == i)[0]
-        pixel_regions[i] = (ras[index], decs[index], g1[index], g2[index], z[index], weights[index])
+        pixel_regions[i] = (ras[index], decs[index], g1[index], g2[index], weights[index])
 
     return pixel_regions
 
@@ -141,7 +141,6 @@ def measure_shear(ridge_catalog,
     dec_background = np.radians(source_catalog.dec)
     g1_background = source_catalog.g1
     g2_background = source_catalog.g2
-    z_background = source_catalog.z # not actually used right now - remove
     weights_background = source_catalog.weight
 
     
@@ -168,10 +167,12 @@ def measure_shear(ridge_catalog,
     # Pre-split the catalog into a low-resolution map, so that we can just look up pixels
     # that are relatively close to the filament points later.
     pixel_regions = precompute_pixel_regions(
-        ra_background, dec_background,
-        g1_background, g2_background,
-        z_background, weights_background,
-        nside_coverage
+        ra_background,
+        dec_background,
+        g1_background,
+        g2_background,
+        weights_background,
+        nside_coverage,
     )
     
 
@@ -187,7 +188,7 @@ def measure_shear(ridge_catalog,
             continue
 
         # Pull out sources within adjacent low-resolution healpix pixels
-        source_coords, ra_subset, dec_subset, g1_subset, g2_subset, z_subset, weights_subset = get_nearby_sources(
+        source_coords, ra_subset, dec_subset, g1_subset, g2_subset, weights_subset = get_nearby_sources(
             ra_filaments[filament_mask], dec_filaments[filament_mask], pixel_regions, nside_coverage
         )
 
