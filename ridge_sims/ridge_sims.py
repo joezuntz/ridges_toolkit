@@ -23,7 +23,6 @@ def get_parameter_objects(h, Omega_m, Omega_b, sigma_8):
     # So we run CAMB once to get the sigma_8 for a fiducial A_s,
     # and then re-scale A_s
     As *= sigma_8 ** 2 / r.get_sigma8_0() ** 2
-    print(sigma_8, r.get_sigma8_0(), As)
 
     pars = camb.set_params(H0=H0, omch2=omch2, ombh2=ombh2, As=As,
                         NonLinear=camb.model.NonLinear_both)
@@ -38,7 +37,7 @@ def get_parameter_objects(h, Omega_m, Omega_b, sigma_8):
 def generate_shell_cl(windows, h, Omega_m, Omega_b, sigma8, filename, lmax):
     # set up CAMB parameters for matter angular power spectrum
     pars, _ = get_parameter_objects(h, Omega_m, Omega_b, sigma8)
-    c_ells = glass.ext.camb.matter_cls(pars, lmax, windows)
+    c_ells = glass.ext.camb.matter_cls(pars, lmax, windows, limber=True, limber_lmin=100)
     np.save(filename, c_ells)
     return c_ells
 

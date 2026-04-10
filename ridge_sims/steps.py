@@ -28,7 +28,9 @@ def step1(config):
         return
 
     _, cosmo = get_parameter_objects(config.h, config.Omega_m, config.Omega_b, config.sigma8)
+    print("Generating windows.")
     windows = shell_configuration(cosmo, config.zmax, config.dx)
+    print("Generating shell Cls.")
     return generate_shell_cl(
         windows,
         config.h,
