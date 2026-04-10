@@ -1,12 +1,29 @@
 import numpy as np
 import warnings
 from .tree import query_tree
-from numba import njit, prange
+from numba import jit, prange
 from numba.core.errors import NumbaPerformanceWarning
-
+import functools
 # Suppress Numba performance warnings
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 
+
+def jit_with_fallback(**jit_kwargs):
+    def decorator(fn):
+        jitted = jit(**jit_kwargs)(fn)
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            try:
+                return jitted(*args, **kwargs)
+            except Exception as e:
+                print(f"JIT execution failed ({e}), retrying with pure Python...")
+                return fn(*args, **kwargs)  # fn is the original, un-jitted function
+
+        wrapper.py_func = fn        # mirror numba's own convention
+        wrapper.jitted  = jitted    # handy if you ever need the jitted version directly
+        return wrapper
+    return decorator
 
 
 def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors):
@@ -15,7 +32,7 @@ def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors):
     return updates
 
 
-@njit(parallel=True)
+@jit_with_fallback(nopython=True, parallel=True)
 def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances):
     # Create a list to store all update values
     update_sizes = np.zeros(ridges.shape[0])
@@ -37,7 +54,7 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
 
 
 
-@njit
+@jit_with_fallback(nopython=True)
 def update_function(point, coordinates, bandwidth, distance):
     """Calculate the mean shift update for a provided mesh point.
     
@@ -92,7 +109,7 @@ def update_function(point, coordinates, bandwidth, distance):
     # Return the projections as the point updates
     return point_updates
 
-@njit
+@jit_with_fallback(nopython=True)
 def gaussian_kernel(values,  bandwidth):
     """Calculate the Gaussian kernel evaluation of distance values.
     
@@ -120,7 +137,7 @@ def gaussian_kernel(values,  bandwidth):
     kernel_value = np.exp(-0.5 * values / bandwidth**2)
     return kernel_value
 
-@njit
+@jit_with_fallback(nopython=True)
 def mean1(a):
     """
     Calculate the mean of a 2D array along axis 1.
@@ -136,7 +153,32 @@ def mean1(a):
         res[i] = np.sum(a[i, :]) / n2
     return res
 
-@njit
+
+@jit_with_fallback(nopython=True)
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the Haversine distance between two points on the sphere.
+
+    Parameters:
+    -----------
+    lat1, lon1 : array
+        Latitude and longitude of the first point in radians.
+
+    lat2, lon2 : float
+        Latitude and longitude of the second point in radians.
+
+    Returns:
+    --------
+    distance : float
+        The Haversine distance between the two points in radians.
+    """
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    return c
+
+@jit_with_fallback(nopython=True)
 def local_inv_cov(point, 
                   coordinates, 
                   bandwidth):
@@ -197,7 +239,7 @@ def local_inv_cov(point,
 
 
 
-def mesh_generation(coordinates, mesh_size, seed=None):
+def mesh_generation(coordinates, num_ridge_points, seed=None):
     """Generate a set of uniformly-random distributed points as a mesh.
     
     The subspace-constrained mean shift algorithm operates on either a grid
@@ -215,7 +257,7 @@ def mesh_generation(coordinates, mesh_size, seed=None):
     coordinates : array-like
         The set of latitudes and longitudes as a two-column array of floats.
     
-    mesh_size : int
+    num_ridge_points : int
         The number of mesh points to be used to generate ridges.
     
     seed: int, optional
@@ -240,8 +282,8 @@ def mesh_generation(coordinates, mesh_size, seed=None):
 
     # Create an array of uniform-random points as a mesh
     rng = np.random.default_rng(seed)
-    mesh_1 = rng.uniform(min_latitude, max_latitude, mesh_size)
-    mesh_2 = rng.uniform(min_longitude, max_longitude, mesh_size)
+    mesh_1 = rng.uniform(min_latitude, max_latitude, num_ridge_points)
+    mesh_2 = rng.uniform(min_longitude, max_longitude, num_ridge_points)
     mesh = np.vstack((mesh_1.flatten(), mesh_2.flatten())).T
 
     # Return the uniform mesh for the coordinates.
