@@ -226,6 +226,7 @@ def measure_shear(ridge_catalog,
 
         if skip_end_points:
             # optionally skip pairs where the filament point is at the end of the filament
+            raise RuntimeError("skip_end_points=True is broken - not ordered")
             mask = (indices[:, 0] > 0) & (indices[:, 0] < len(filament_coords) - 1)
             valid_bins = valid_bins & mask
 

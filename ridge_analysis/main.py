@@ -80,8 +80,13 @@ def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatal
     output.save()
     return output
 
-def measure_ridge_shear(ridge_segments: RidgeSegmentCatalog, source_catalog: SourceCatalog, shear_config: ShearConfig):
+def measure_ridge_shear(source_catalog: SourceCatalog, shear_config: ShearConfig):
+
+    ridge_segments = RidgeSegmentCatalog(shear_config.ridge_file)
     ridge_segments.load()
+
+    source_catalog = SourceCatalog(shear_config.source_catalog_file)
+    source_catalog.load()
 
     shear_table = measure_shear(ridge_segments,
                   source_catalog,
