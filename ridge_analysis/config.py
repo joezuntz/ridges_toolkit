@@ -22,9 +22,8 @@ class DredgeConfig:
     lens_catalog_file: str
     ridge_point_file: str
     checkpoint_dir: str
-    checkpoint_dir: str
     bandwidth: float = 6.0  # in arcmin
-    ridge_points: int = 500_000
+    num_ridge_points: int = 500_000
     neighbours: int = 5000
     convergence: float = 0.03 # in arcmin
     seed: int = 0

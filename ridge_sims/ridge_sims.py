@@ -71,11 +71,11 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
     
     # compute the lensing maps for this shell
     dtype=[
-        ("RA", float),
-        ("DEC", float),
-        ("Z_TRUE", float),
-        ("G1", float),
-        ("G2", float),
+        ("ra", float),
+        ("dec", float),
+        ("z", float),
+        ("g1", float),
+        ("g2", float),
     ]
 
     catalog = []
@@ -103,11 +103,11 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
         )
         # make a mini-catalogue for the new rows
         rows = np.empty(gal_count, dtype=dtype)
-        rows["RA"] = gal_lon
-        rows["DEC"] = gal_lat
-        rows["Z_TRUE"] = gal_z
-        rows["G1"] = gal_she.real
-        rows["G2"] = gal_she.imag
+        rows["ra"] = gal_lon
+        rows["dec"] = gal_lat
+        rows["z"] = gal_z
+        rows["g1"] = gal_she.real
+        rows["g2"] = gal_she.imag
 
         catalog.append(rows)
 
@@ -122,9 +122,9 @@ def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rn
     
     # compute the lensing maps for this shell
     dtype=[
-        ("RA", float),
-        ("DEC", float),
-        ("Z_TRUE", float),
+        ("ra", float),
+        ("dec", float),
+        ("z", float),
     ]
 
     catalog = []
@@ -142,9 +142,9 @@ def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rn
         # generate galaxy ellipticities from the chosen distribution
 
         rows = np.empty(gal_count, dtype=dtype)
-        rows["RA"] = gal_lon
-        rows["DEC"] = gal_lat
-        rows["Z_TRUE"] = gal_z
+        rows["ra"] = gal_lon
+        rows["dec"] = gal_lat
+        rows["z"] = gal_z
 
         catalog.append(rows)
 

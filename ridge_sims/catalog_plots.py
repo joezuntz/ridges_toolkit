@@ -11,7 +11,7 @@ import os
 
 def make_count_map(nside, cat):
     npix = healpy.nside2npix(nside)
-    pix = healpy.ang2pix(nside, cat["RA"], cat["DEC"], lonlat=True)
+    pix = healpy.ang2pix(nside, cat["ra"], cat["dec"], lonlat=True)
     m = np.bincount(pix, minlength=npix)
     return m
 
@@ -51,8 +51,8 @@ def catalog_checks(l0, s0):
     print("Source density:", get_density(s0))
 
 def redshift_histograms(l0, s0):
-    plt.hist(s0['Z_TRUE'], bins=100, histtype='step', label='Source');
-    plt.hist(l0['Z_TRUE'], bins=100, histtype='step', label='Lens');   
+    plt.hist(s0['z'], bins=100, histtype='step', label='Source');
+    plt.hist(l0['z'], bins=100, histtype='step', label='Lens');   
     plt.legend()
     plt.xlabel('Redshift')
     plt.ylabel('Count')
@@ -102,16 +102,16 @@ def random_points_in_mask(nside, density_sqarcmin=10, thin=10):
 
         np.save(filename, [ra, dec])
         print("Saving random cat")
-    rcat = {"RA": ra, "DEC": dec}
-    rsub = {"RA": ra[::thin], "DEC": dec[::thin]}
+    rcat = {"ra": ra, "dec": dec}
+    rsub = {"ra": ra[::thin], "dec": dec[::thin]}
     return rcat, rsub
 
 def measure_xi(cat):
     c = treecorr.Catalog(
-        ra=cat["RA"],
-        dec=cat["DEC"],
-        g1=cat["G1"],
-        g2=cat["G2"],
+        ra=cat["ra"],
+        dec=cat["dec"],
+        g1=cat["g1"],
+        g2=cat["g2"],
         ra_units="deg",
         dec_units="deg",
     )
@@ -130,20 +130,20 @@ def measure_xi(cat):
 
 def measure_w(lcat, rancat, rancatsub):
     c = treecorr.Catalog(
-        ra=lcat["RA"],
-        dec=lcat["DEC"],
+        ra=lcat["ra"],
+        dec=lcat["dec"],
         ra_units="deg",
         dec_units="deg",        
     )
     r = treecorr.Catalog(
-        ra=rancat["RA"],
-        dec=rancat["DEC"],
+        ra=rancat["ra"],
+        dec=rancat["dec"],
         ra_units="deg",
         dec_units="deg",
     )
     rsub = treecorr.Catalog(
-        ra=rancatsub["RA"],
-        dec=rancatsub["DEC"],
+        ra=rancatsub["ra"],
+        dec=rancatsub["dec"],
         ra_units="deg",
         dec_units="deg",
     )
@@ -170,22 +170,22 @@ def measure_w(lcat, rancat, rancatsub):
 
 def measure_gammat(scat, lcat, rancat):
     sc = treecorr.Catalog(
-        ra=scat["RA"],
-        dec=scat["DEC"],
-        g1=scat["G1"],
-        g2=scat["G2"],
+        ra=scat["ra"],
+        dec=scat["dec"],
+        g1=scat["g1"],
+        g2=scat["g2"],
         ra_units="deg",
         dec_units="deg",
     )
     lc = treecorr.Catalog(
-        ra=lcat["RA"],
-        dec=lcat["DEC"],
+        ra=lcat["ra"],
+        dec=lcat["dec"],
         ra_units="deg",
         dec_units="deg",        
     )
     r = treecorr.Catalog(
-        ra=rancat["RA"],
-        dec=rancat["DEC"],
+        ra=rancat["ra"],
+        dec=rancat["dec"],
         ra_units="deg",
         dec_units="deg",
     )
