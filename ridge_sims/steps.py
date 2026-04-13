@@ -70,6 +70,9 @@ def step3(config, sigma_e_default=1e-3):
     """
     Generate catalog files
     """
+    if os.path.exists(config.source_cat_file.format(0)) and os.path.exists(config.lens_cat_file.format(0)):
+        print(f"Found source and lens catalog files, skipping step 3")
+        return
     rng = np.random.default_rng(seed=config.seed)
 
     # Load the number density information
