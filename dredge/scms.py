@@ -1,29 +1,12 @@
 import numpy as np
 import warnings
 from .tree import query_tree
-from numba import jit, prange
+from numba import njit, prange
 from numba.core.errors import NumbaPerformanceWarning
-import functools
+
 # Suppress Numba performance warnings
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 
-
-def jit_with_fallback(**jit_kwargs):
-    def decorator(fn):
-        jitted = jit(**jit_kwargs)(fn)
-
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            try:
-                return jitted(*args, **kwargs)
-            except Exception as e:
-                print(f"JIT execution failed ({e}), retrying with pure Python...")
-                return fn(*args, **kwargs)  # fn is the original, un-jitted function
-
-        wrapper.py_func = fn        # mirror numba's own convention
-        wrapper.jitted  = jitted    # handy if you ever need the jitted version directly
-        return wrapper
-    return decorator
 
 
 def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors):
@@ -32,7 +15,7 @@ def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors):
     return updates
 
 
-@jit_with_fallback(nopython=True, parallel=True)
+@njit(parallel=True)
 def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances):
     # Create a list to store all update values
     update_sizes = np.zeros(ridges.shape[0])
@@ -54,7 +37,7 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
 
 
 
-@jit_with_fallback(nopython=True)
+@njit
 def update_function(point, coordinates, bandwidth, distance):
     """Calculate the mean shift update for a provided mesh point.
     
@@ -109,7 +92,7 @@ def update_function(point, coordinates, bandwidth, distance):
     # Return the projections as the point updates
     return point_updates
 
-@jit_with_fallback(nopython=True)
+@njit
 def gaussian_kernel(values,  bandwidth):
     """Calculate the Gaussian kernel evaluation of distance values.
     
@@ -137,7 +120,7 @@ def gaussian_kernel(values,  bandwidth):
     kernel_value = np.exp(-0.5 * values / bandwidth**2)
     return kernel_value
 
-@jit_with_fallback(nopython=True)
+@njit
 def mean1(a):
     """
     Calculate the mean of a 2D array along axis 1.
@@ -153,32 +136,7 @@ def mean1(a):
         res[i] = np.sum(a[i, :]) / n2
     return res
 
-
-@jit_with_fallback(nopython=True)
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """
-    Calculate the Haversine distance between two points on the sphere.
-
-    Parameters:
-    -----------
-    lat1, lon1 : array
-        Latitude and longitude of the first point in radians.
-
-    lat2, lon2 : float
-        Latitude and longitude of the second point in radians.
-
-    Returns:
-    --------
-    distance : float
-        The Haversine distance between the two points in radians.
-    """
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
-    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-    return c
-
-@jit_with_fallback(nopython=True)
+@njit
 def local_inv_cov(point, 
                   coordinates, 
                   bandwidth):
