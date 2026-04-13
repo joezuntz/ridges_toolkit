@@ -37,8 +37,9 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
         checkpoint_dir=dredge_config.checkpoint_dir,
         resume=True,
         seed=dredge_config.seed,
-        mesh_size=dredge_config.mesh_size
+        num_ridge_points=dredge_config.num_ridge_points
     )
+
 
     if comm is None or comm.rank == 0:
         output = RidgePointCatalog(dredge_config.ridge_point_file)

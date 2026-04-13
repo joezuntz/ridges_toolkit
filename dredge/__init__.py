@@ -51,7 +51,7 @@ optional parameters can be manually set by the user:
     zero, indicating no multiprocessing, and different positive integers
     can be set to specify the number of cores that should be used.
 
-(7) The parameter 'mesh_size' can be set to specify the number of points
+(7) The parameter 'num_ridge_points' can be set to specify the number of points
     that should be used to generate the initial mesh from which the ridges
     are formed over the course of multiple iterations. By default, this is
     set to a number that enables reasonably fast computing times, but larger

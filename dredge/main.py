@@ -12,7 +12,7 @@ def find_filaments(coordinates,
               convergence = np.radians(0.005),
               max_unconverged_fraction = 0.005,
               max_iterations = 5000,
-              mesh_size = None,
+              num_ridge_points = None,
               n_neighbors = 5000,
               distance_metric = "haversine",
               mesh_threshold = 4.0,
@@ -60,7 +60,7 @@ def find_filaments(coordinates,
     max_iterations : int, defaults to 5000
         The maximum number of iterations to run before stopping.
     
-    mesh_size : int, defaults to None
+    num_ridge_points : int, defaults to None
         The number of mesh points to be used to generate ridges.
 
     n_neighbors : int, defaults to 5000
@@ -116,8 +116,8 @@ def find_filaments(coordinates,
     None
     """
     # Set a mesh size if none is provided by the user
-    if mesh_size is None:
-        mesh_size = int(np.min([1e5, np.max([5e4, len(coordinates)])]))
+    if num_ridge_points is None:
+        num_ridge_points = int(np.min([1e5, np.max([5e4, len(coordinates)])]))
 
     parameter_check(**locals())
 
@@ -129,13 +129,12 @@ def find_filaments(coordinates,
     if checkpoint_dir is not None and is_root:
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-
     # Only the root process makes the mesh and the tree, so that
     # every process is using the exact same one.
     if is_root:
         print("Generated mesh.  Making tree.")
         # Create an evenly-spaced mesh in for the provided coordinates
-        ridges = mesh_generation(coordinates, mesh_size, seed)
+        ridges = mesh_generation(coordinates, num_ridge_points, seed)
 
         # Make the ball tree to speed up finding nearby points
         tree = make_tree(coordinates, distance_metric, tree_file)
@@ -269,7 +268,7 @@ def parameter_check(**p):
     n_neighbours = p["n_neighbors"]
     bandwidth = p["bandwidth"]
     convergence = p["convergence"]
-    mesh_size = p["mesh_size"]
+    num_ridge_points = p["num_ridge_points"]
     distance_metric = p["distance_metric"]
     mesh_threshold = p["mesh_threshold"]
     checkpoint_dir = p["checkpoint_dir"]
@@ -301,9 +300,9 @@ def parameter_check(**p):
     if not (isinstance(convergence, float) and convergence > 0):
         raise ValueError("ERROR: convergence must be a positive integer or float")
     
-    # Check whether mesh_size is a positive integer
-    if not (isinstance(mesh_size, int) and mesh_size > 0):
-        raise ValueError("ERROR: mesh_size must be a positive integer")
+    # Check whether num_ridge_points is a positive integer
+    if not (isinstance(num_ridge_points, int) and num_ridge_points > 0):
+        raise ValueError("ERROR: num_ridge_points must be a positive integer")
 
     # Check whether distance is one of two allowed strings
     if distance_metric not in ["haversine", "euclidean"]:
