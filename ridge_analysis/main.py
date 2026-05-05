@@ -1,5 +1,5 @@
 import numpy as np
-from ridge_analysis.shear import measure_shear
+from .shear import measure_shear
 from .io import RidgeSegmentCatalog, LensCatalog, SourceCatalog, RidgePointCatalog
 from .config import DredgeConfig, SegmentationConfig, ShearConfig
 
