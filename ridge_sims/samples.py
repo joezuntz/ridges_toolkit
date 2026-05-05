@@ -3,8 +3,10 @@ import healpy
 import yaml
 from types import SimpleNamespace
 
+
 class SampleInfo(SimpleNamespace):
     pass
+
 
 mask_filename = "des-data/desy3_gold_mask.npy"
 lsst_mask_filename_y1 = "lsst-data/lsst_y1_wfd_exgal_mask_nside_64.fits"
@@ -65,13 +67,14 @@ combined_sigma_e = [np.mean(tomographic_sigma_e)]
 
 # Number density per bin for DES (Giulia)
 tomographic_source_number_densities = [
-    1.475584985490327, 
+    1.475584985490327,
     1.479383426887689,
     1.483671693529899,
     1.461247850098986,
 ]
 
 combined_source_number_densities = sum(tomographic_source_number_densities)
+
 
 def load_lsst_sample_information(lsst, combined):
     """
@@ -89,32 +92,31 @@ def load_lsst_sample_information(lsst, combined):
     -------
     sample : SampleInfo
         The object containing the number density information.
-    
+
     """
     if lsst not in [1, 10]:
         raise ValueError("lsst must be 1 or 10 if not False/0")
-    
+
     # Load the n_eff from the numpy files from forecasting. They are already in units of
     # objects per arcmin^2
-    clustering_neff = np.load(f'lsst-data/lsst_n_eff_clustering_year_{lsst}.npy', allow_pickle=True).item()["n_gal"]
-    lensing_neff = np.load(f'lsst-data/lsst_n_eff_lensing_year_{lsst}.npy', allow_pickle=True).item()["n_gal"]
+    clustering_neff = np.load(f"lsst-data/lsst_n_eff_clustering_year_{lsst}.npy", allow_pickle=True).item()["n_gal"]
+    lensing_neff = np.load(f"lsst-data/lsst_n_eff_lensing_year_{lsst}.npy", allow_pickle=True).item()["n_gal"]
     clustering_neff = np.array(clustering_neff)
-    lensing_neff =  np.array(lensing_neff)
+    lensing_neff = np.array(lensing_neff)
     print(clustering_neff.shape, lensing_neff.shape, clustering_neff.dtype, lensing_neff.dtype)
 
     nbin_source = len(lensing_neff)
     nbin_lens = len(clustering_neff)
 
     # Load the n(z) from the numpy files from forecasting. I think these are all normalized to 1
-    # already, but just in case we will normalize them again below.
+    # already, but just in case we will normalize them again below.
     source_nz_data = np.load(f"lsst-data/srd_source_bins_year_{lsst}.npy", allow_pickle=True).item()
-    source_z = source_nz_data['redshift_range']
-    source_nz = np.array([source_nz_data['bins'][i] for i in range(nbin_source)])
+    source_z = source_nz_data["redshift_range"]
+    source_nz = np.array([source_nz_data["bins"][i] for i in range(nbin_source)])
 
     lens_nz_data = np.load(f"lsst-data/srd_lens_bins_year_{lsst}.npy", allow_pickle=True).item()
-    lens_z = lens_nz_data['redshift_range']
-    lens_nz = np.array([lens_nz_data['bins'][i] for i in range(nbin_lens)])
-
+    lens_z = lens_nz_data["redshift_range"]
+    lens_nz = np.array([lens_nz_data["bins"][i] for i in range(nbin_lens)])
 
     # Load galaxy bias from the yaml file from forecasting
     galaxy_bias = np.zeros(nbin_lens)
@@ -123,40 +125,39 @@ def load_lsst_sample_information(lsst, combined):
         for i in range(nbin_lens):
             galaxy_bias[i] = galaxy_bias_data[f"b_{i+1}"]
 
-    # In the forecasting they always use sigma_e = 0.26
-    sigma_e  = np.full(lensing_neff.shape, 0.26)
+    # In the forecasting they always use sigma_e = 0.26
+    sigma_e = np.full(lensing_neff.shape, 0.26)
 
-
-    # Normalize both the source and lens
+    # Normalize both the source and lens
     for i in range(nbin_source):
         source_nz[i] /= np.trapezoid(source_nz[i], source_z)
         source_nz[i] *= lensing_neff[i]
-    
+
     for i in range(nbin_lens):
         lens_nz[i] /= np.trapezoid(lens_nz[i], lens_z)
         lens_nz[i] *= clustering_neff[i]
 
-    # If we are combining into a single tomographic bin then:
+    # If we are combining into a single tomographic bin then:
     if combined:
         # The n_effs just sum
         lensing_neff = [np.sum(lensing_neff)]
         clustering_neff = [np.sum(clustering_neff)]
-        # The galaxy bias is the mean. We should ideally use
-        # the weighted mean but this is close enough as there is
-        # not much variation in the neffs
+        # The galaxy bias is the mean. We should ideally use
+        # the weighted mean but this is close enough as there is
+        # not much variation in the neffs
         galaxy_bias = [np.mean(galaxy_bias)]
         # This one is correct as the source sample has equal numbers
-        # of objets in each bin by construction
+        # of objets in each bin by construction
         sigma_e = [np.mean(sigma_e)]
 
         # The n(z)'s sum because they are normalized by the neff above.
         source_nz = np.array([np.sum(source_nz, axis=0)])
         lens_nz = np.array([np.sum(lens_nz, axis=0)])
-        # The counts are now just one bin each
+        # The counts are now just one bin each
         nbin_source = 1
         nbin_lens = 1
 
-    # Collect everything into the SampleInfo object
+    # Collect everything into the SampleInfo object
     sample = SampleInfo()
     sample.nbin_source = nbin_source
     sample.nbin_lens = nbin_lens
@@ -171,13 +172,12 @@ def load_lsst_sample_information(lsst, combined):
 
     return sample
 
-    
 
-def load_sample_information(lens_type, combined=True, lsst=False): 
+def load_sample_information(lens_type, combined=True, lsst=False):
     """
     Create and return a SampleInfo object with the number density information
-    for the source and lens samples, and galaxy bias for the latter. 
-    
+    for the source and lens samples, and galaxy bias for the latter.
+
     The number densities are taken from the DES Y3 data release.
 
     Parameters
@@ -185,7 +185,7 @@ def load_sample_information(lens_type, combined=True, lsst=False):
     lens_type : str
         The type of lens sample to use. Must be 'maglim' or 'redmagic'.
 
-    combined : bool 
+    combined : bool
         Whether to use the combined source and lens samples. Default is True.
         If False use tomographic samples.
 
@@ -215,7 +215,6 @@ def load_sample_information(lens_type, combined=True, lsst=False):
         source_number_densities = tomographic_source_number_densities
         sigma_e = tomographic_sigma_e
 
-
     if lens_type == "maglim":
         if combined:
             lens_number_densities = [maglim_combined_number_densities]
@@ -225,7 +224,7 @@ def load_sample_information(lens_type, combined=True, lsst=False):
             sample.lens_number_densities = tomographic_maglim_number_densities
             sample.galaxy_bias = tomographic_maglim_bias
             lens_data = np.loadtxt(tomographic_maglim_nz_filename).T
-            
+
     else:
         if combined:
             lens_number_densities = [redmagic_combined_number_densities]
@@ -244,11 +243,10 @@ def load_sample_information(lens_type, combined=True, lsst=False):
     for i in range(nbin_source):
         source_nz[i] /= np.trapezoid(source_nz[i], source_z)
         source_nz[i] *= source_number_densities[i]
-    
+
     for i in range(nbin_lens):
         lens_nz[i] /= np.trapezoid(lens_nz[i], lens_z)
         lens_nz[i] *= lens_number_densities[i]
-
 
     sample = SampleInfo()
     sample.nbin_source = nbin_source
@@ -262,9 +260,7 @@ def load_sample_information(lens_type, combined=True, lsst=False):
     sample.source_number_densities = source_number_densities
     sample.sigma_e = sigma_e
 
-
     return sample
-
 
 
 ##################################################################################
@@ -298,7 +294,6 @@ def _load_lsst_y10_bins(path, nbin=None):
     return z, nz
 
 
-
 def _normalize_then_scale(nz, z, target_densities):
     nz = np.asarray(nz, dtype=float)
     z = np.asarray(z, dtype=float)
@@ -318,7 +313,6 @@ def _normalize_then_scale(nz, z, target_densities):
     return out
 
 
-
 def load_sample_information_advanced(lens_type, combined=True, lsst=False, lsst10_nz=False):
     """
     Same as load_sample_information, but if lsst10_nz=True (and lsst is False/None),
@@ -336,20 +330,16 @@ def load_sample_information_advanced(lens_type, combined=True, lsst=False, lsst1
         y = 10
 
         if not combined:
-            
+
             raise ValueError("Hybrid LSST10_nz mode is implemented only for combined=True.")
 
         # Load LSST Y10 shapes; for combined=True we want 1 bin each.
-        source_z, source_nz_lsst = _load_lsst_y10_bins(
-            f"lsst-data/srd_source_bins_year_{y}.npy", nbin=None
-        )
-        lens_z, lens_nz_lsst = _load_lsst_y10_bins(
-            f"lsst-data/srd_lens_bins_year_{y}.npy", nbin=None
-        )
+        source_z, source_nz_lsst = _load_lsst_y10_bins(f"lsst-data/srd_source_bins_year_{y}.npy", nbin=None)
+        lens_z, lens_nz_lsst = _load_lsst_y10_bins(f"lsst-data/srd_lens_bins_year_{y}.npy", nbin=None)
 
         # Combine LSST bins into a single shape (sum the per-bin curves)
         source_shape = np.sum(source_nz_lsst, axis=0)[None, :]
-        lens_shape   = np.sum(lens_nz_lsst, axis=0)[None, :]
+        lens_shape = np.sum(lens_nz_lsst, axis=0)[None, :]
 
         # Overwrite z grids + renormalize to DES densities already stored in sample
         sample.source_z = source_z
@@ -362,8 +352,6 @@ def load_sample_information_advanced(lens_type, combined=True, lsst=False, lsst1
 
 
 #################################################################################################
-
-
 
 
 def load_mask(nside, lsst=False):
@@ -383,9 +371,8 @@ def load_mask(nside, lsst=False):
         hit_pix = np.load(mask_filename)
         mask = np.zeros(healpy.nside2npix(input_mask_nside))
         mask[hit_pix] = 1
-        mask = healpy.reorder(mask, n2r = True)
+        mask = healpy.reorder(mask, n2r=True)
 
     # degrade mask to nside quality of simulation
-    mask = healpy.ud_grade(mask, nside_out = nside)
+    mask = healpy.ud_grade(mask, nside_out=nside)
     return mask
-

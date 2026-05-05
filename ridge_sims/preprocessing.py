@@ -4,7 +4,6 @@ from astropy.io import fits
 from astropy.table import Table
 from scipy.interpolate import make_smoothing_spline
 
-
 gold_mask_file = "des-data/DESY3_GOLD_2_2.1.h5"
 redmagic_nz_file = "2pt_NG_final_2ptunblind_02_24_21_wnz_covupdate.v2.fits"
 maglim_nz_file = "2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate.fits"
@@ -17,28 +16,26 @@ dnf_file = "des-data/DESY3_GOLD_2_2.1_DNF.h5"
 def calibrate_shears(index_file, metacal_file):
     delta_gamma = 0.02
 
-    with h5py.File(index_file, 'r') as f:
-        # for the selection bias calculation.
-        # These are index arrays into the full set.
+    with h5py.File(index_file, "r") as f:
+        # for the selection bias calculation.
+        # These are index arrays into the full set.
         s00 = f["/index/metacal/select"][:]
         s1m = f["/index/metacal/select_1m"][:]
         s1p = f["/index/metacal/select_1p"][:]
         s2m = f["/index/metacal/select_2m"][:]
         s2p = f["/index/metacal/select_2p"][:]
 
-
-    with h5py.File(metacal_file, 'r') as f:
+    with h5py.File(metacal_file, "r") as f:
         # The main response term is just the mean of the Rij columns
         # selected by the s00
-        R11 = f['catalog/unsheared/R11'][:][s00].mean()
-        R22 = f['catalog/unsheared/R22'][:][s00].mean()
-        R12 = f['catalog/unsheared/R12'][:][s00].mean()
-        R21 = f['catalog/unsheared/R21'][:][s00].mean()
+        R11 = f["catalog/unsheared/R11"][:][s00].mean()
+        R22 = f["catalog/unsheared/R22"][:][s00].mean()
+        R12 = f["catalog/unsheared/R12"][:][s00].mean()
+        R21 = f["catalog/unsheared/R21"][:][s00].mean()
         R_gamma = np.array([[R11, R12], [R21, R22]])
 
-        e1 = f['catalog/unsheared/e_1'][:]
-        e2 = f['catalog/unsheared/e_2'][:]
-
+        e1 = f["catalog/unsheared/e_1"][:]
+        e2 = f["catalog/unsheared/e_2"][:]
 
     S11 = (e1[s1p].mean() - e1[s1m].mean()) / delta_gamma
     S22 = (e2[s2p].mean() - e2[s2m].mean()) / delta_gamma
@@ -54,17 +51,16 @@ def calibrate_shears(index_file, metacal_file):
     return s00, e1, e2
 
 
-
 def extract_source_samples(index_file, metacal_file, shear_output_file):
     # 1 load the metacal sample, apply the /index/metacal/select selection,
     # calibrate it (R and S), and save it.
 
     sel, e1, e2 = calibrate_shears(index_file, metacal_file)
     print("Calibrated shears")
-    with h5py.File(metacal_file, 'r') as f:
-        ra = f['/catalog/unsheared/ra'][:][sel]
-        dec = f['/catalog/unsheared/dec'][:][sel]
-        weight = f['/catalog/unsheared/weight'][:][sel]
+    with h5py.File(metacal_file, "r") as f:
+        ra = f["/catalog/unsheared/ra"][:][sel]
+        dec = f["/catalog/unsheared/dec"][:][sel]
+        weight = f["/catalog/unsheared/weight"][:][sel]
 
     print("Read source sample")
 
@@ -74,12 +70,13 @@ def extract_source_samples(index_file, metacal_file, shear_output_file):
         f.create_dataset("e1", data=e1)
         f.create_dataset("e2", data=e2)
         f.create_dataset("weight", data=weight)
-    
+
     # we can just use the source n(z) file for this since it should match,
     # as we are not doing any additional cuts, so no need to extract it from anywhere
 
+
 def extract_maglim_sample(index_file, lens_file, dnf_file, maglim_output_file):
-    with h5py.File(index_file, 'r') as f:
+    with h5py.File(index_file, "r") as f:
         sel = f["/index/maglim/select"][:]
     print("Read maglim index")
 
@@ -89,11 +86,11 @@ def extract_maglim_sample(index_file, lens_file, dnf_file, maglim_output_file):
         weight = f["/catalog/maglim/weight"][:][sel]
 
     print("Read maglim sample")
-    
+
     with h5py.File(dnf_file, "r") as f:
-        # used for estimating the ensemble
+        # used for estimating the ensemble
         z_mc = f["/catalog/unsheared/zmc_sof"][:][sel]
-        # used for the cut
+        # used for the cut
         z_mean = f["/catalog/unsheared/zmean_sof"][:][sel]
 
     print("Read maglim redshifts")
@@ -110,7 +107,7 @@ def extract_maglim_sample(index_file, lens_file, dnf_file, maglim_output_file):
 
 def extract_redmagic_sample(index_file, lens_file, redmagic_output_file):
 
-    with h5py.File(index_file, 'r') as f:
+    with h5py.File(index_file, "r") as f:
         sel = f["/index/redmagic/combined_sample_fid/select"][:]
 
     print("Read redmagic index")
@@ -130,10 +127,11 @@ def extract_redmagic_sample(index_file, lens_file, redmagic_output_file):
         f.create_dataset("z_sample", data=z_sample)
         f.create_dataset("z", data=z)
 
+
 def estimate_lens_nz_with_cut(input_file, zmax, output_file):
     with h5py.File(input_file) as f:
         z = f["z"][:]
-        z_mc = f["z_sample"][:]   
+        z_mc = f["z_sample"][:]
         weight = f["weight"][:]
 
     cut = z < zmax
@@ -142,7 +140,7 @@ def estimate_lens_nz_with_cut(input_file, zmax, output_file):
 
     dz = 0.01
     # we go up to well above the max z here because
-    # there can be catastrophic outliers sometimes
+    # there can be catastrophic outliers sometimes
     bins = np.arange(0, 3.005, dz)
 
     if z_mc.ndim == 2:
@@ -157,18 +155,19 @@ def estimate_lens_nz_with_cut(input_file, zmax, output_file):
     mids = 0.5 * (edges[1:] + edges[:-1])
     np.savetxt(output_file, np.transpose([mids, counts]), header="z n_z")
 
+
 def estimate_smooth_source_nz(index_file, metacal_file, dnf_file, output_file):
 
-    with h5py.File(index_file, 'r') as f:
-        # for the selection bias calculation.
-        # These are index arrays into the full set.
+    with h5py.File(index_file, "r") as f:
+        # for the selection bias calculation.
+        # These are index arrays into the full set.
         sel = f["/index/metacal/select"][:]
 
-    with h5py.File(metacal_file, 'r') as f:
-        weight = f['/catalog/unsheared/weight'][:][sel]
+    with h5py.File(metacal_file, "r") as f:
+        weight = f["/catalog/unsheared/weight"][:][sel]
 
     with h5py.File(dnf_file, "r") as f:
-        # used for estimating the ensemble
+        # used for estimating the ensemble
         z_mc = f["/catalog/unsheared/zmc_sof"][:][sel]
 
     dz = 0.01
@@ -184,7 +183,6 @@ def estimate_smooth_source_nz(index_file, metacal_file, dnf_file, output_file):
     np.savetxt(output_file, np.transpose([mids, smooth_nz]), header="z n_z")
 
 
-
 def extract_des_mask_from_gold(mask_file):
     """
     This is a one-off pre-run step to pull
@@ -193,10 +191,11 @@ def extract_des_mask_from_gold(mask_file):
     Once it's done you can just load the mask
     from the numpy mask file.
     """
-    with h5py.File(gold_mask_file, 'r') as f:
-        # This is an index of hea
+    with h5py.File(gold_mask_file, "r") as f:
+        # This is an index of hea
         mask = f["/masks/gold/hpix"][:]
     np.save(mask, mask_file)
+
 
 def extract_nz(nz_fits_file, lens_output_file, source_output_file):
     """
@@ -214,34 +213,35 @@ def extract_nz(nz_fits_file, lens_output_file, source_output_file):
     with fits.open(nz_fits_file) as f:
         source_data = f[source_extname].data
         lens_data = f[lens_extname].data
-    
-        source_z = source_data["Z_MID"]
-        nz_source = [source_data[f"BIN{i}"] for i in range(1, nbin_source+1)]
 
-        source_table = Table([source_z] + nz_source, names=["Z"] + [f"BIN{i}" for i in range(1, nbin_source+1)])
-        source_table.write(source_output_file, format='ascii.commented_header', overwrite=True)
+        source_z = source_data["Z_MID"]
+        nz_source = [source_data[f"BIN{i}"] for i in range(1, nbin_source + 1)]
+
+        source_table = Table([source_z] + nz_source, names=["Z"] + [f"BIN{i}" for i in range(1, nbin_source + 1)])
+        source_table.write(source_output_file, format="ascii.commented_header", overwrite=True)
 
         lens_z = lens_data["Z_MID"]
-        nz_lens = [lens_data[f"BIN{i}"] for i in range(1, nbin_lens+1)]
+        nz_lens = [lens_data[f"BIN{i}"] for i in range(1, nbin_lens + 1)]
 
-        lens_table = Table([lens_z] + nz_lens, names=["Z"] + [f"BIN{i}" for i in range(1, nbin_lens+1)])
-        lens_table.write(lens_output_file, format='ascii.commented_header', overwrite=True)
+        lens_table = Table([lens_z] + nz_lens, names=["Z"] + [f"BIN{i}" for i in range(1, nbin_lens + 1)])
+        lens_table.write(lens_output_file, format="ascii.commented_header", overwrite=True)
+
 
 def extract_source_nz(nz_fits_file, source_output_file):
     source_extname = "nz_source"
     nbin_source = 4
     with fits.open(nz_fits_file) as f:
-        source_data = f[source_extname].data    
+        source_data = f[source_extname].data
         source_header = f[source_extname].header
         source_z = source_data["Z_MID"]
-        nz_source = [source_data[f"BIN{i}"] for i in range(1, nbin_source+1)]
-        nz_ngal = [source_header[f'NGAL_{i}'] for i in range(1, nbin_source+1)]
-        nz_source_combined =  sum([nz_source[i] * nz_ngal[i] for i in range(nbin_source)])
+        nz_source = [source_data[f"BIN{i}"] for i in range(1, nbin_source + 1)]
+        nz_ngal = [source_header[f"NGAL_{i}"] for i in range(1, nbin_source + 1)]
+        nz_source_combined = sum([nz_source[i] * nz_ngal[i] for i in range(nbin_source)])
 
     cut = source_z < 2.0
     source_z = source_z[cut]
     nz_source_combined = nz_source_combined[cut]
-    with open(source_output_file, 'w') as f:
+    with open(source_output_file, "w") as f:
         f.write("# z n(z)\n")
         for z, nz in zip(source_z, nz_source_combined):
             f.write(f"{z} {nz}\n")

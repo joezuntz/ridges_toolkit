@@ -9,17 +9,19 @@ import multiprocessing
 import functools
 import os
 
+
 def make_count_map(nside, cat):
     npix = healpy.nside2npix(nside)
     pix = healpy.ang2pix(nside, cat["ra"], cat["dec"], lonlat=True)
     m = np.bincount(pix, minlength=npix)
     return m
 
+
 def get_density(cat):
     nside = 512
     m = make_count_map(nside, cat)
     m = healpy.ud_grade(m, nside, power=-2)
-    npix_hit = (m>0).sum()
+    npix_hit = (m > 0).sum()
     nsqdeg_per_pixel = healpy.nside2pixarea(nside, degrees=True)
     nsqarcmin_per_pixel = nsqdeg_per_pixel * 3600
     area_hit_sqdeg = npix_hit * nsqdeg_per_pixel
@@ -27,15 +29,16 @@ def get_density(cat):
     density = len(cat) / area_hit_sqarcmin
     return density, area_hit_sqdeg
 
+
 def make_maps(l0, s0):
     nside = 512
     lmap = make_count_map(nside, l0)
     smap = make_count_map(nside, s0)
     print("Made count maps")
-    healpy.mollview(lmap,  title="Lens count")
+    healpy.mollview(lmap, title="Lens count")
     plt.savefig("./sim-fiducial/lens_count.png")
     plt.close()
-    healpy.mollview(smap,  title="Source count")
+    healpy.mollview(smap, title="Source count")
     plt.savefig("./sim-fiducial/source_count.png")
     plt.close()
 
@@ -46,32 +49,36 @@ def make_maps(l0, s0):
     plt.savefig("./sim-fiducial/source_count_zoom.png")
     plt.close()
 
+
 def catalog_checks(l0, s0):
     print("Lens density:", get_density(l0))
     print("Source density:", get_density(s0))
 
+
 def redshift_histograms(l0, s0):
-    plt.hist(s0['z'], bins=100, histtype='step', label='Source');
-    plt.hist(l0['z'], bins=100, histtype='step', label='Lens');   
+    plt.hist(s0["z"], bins=100, histtype="step", label="Source")
+    plt.hist(l0["z"], bins=100, histtype="step", label="Lens")
     plt.legend()
-    plt.xlabel('Redshift')
-    plt.ylabel('Count')
-    plt.title('Redshift distribution')
-    plt.savefig('./sim-fiducial/redshift_histogram.png')
+    plt.xlabel("Redshift")
+    plt.ylabel("Count")
+    plt.title("Redshift distribution")
+    plt.savefig("./sim-fiducial/redshift_histogram.png")
     plt.close()
     print("plotted z hists")
+
 
 def gen_random(i, n, mask, nside):
     ra = np.random.uniform(0, 360, n)
     dec = np.rad2deg(np.arcsin(np.random.uniform(-1, 1, n)))
     pix = healpy.ang2pix(nside, ra, dec, lonlat=True)
-    # get mask value of pixel                                                                                                                                                          
+    # get mask value of pixel
     mask_value = mask[pix]
-    # keep only points in mask                                                                                                                                                         
+    # keep only points in mask
     ra = ra[mask_value > 0]
     dec = dec[mask_value > 0]
     print("Generated random sample ", i)
     return (ra, dec)
+
 
 def random_points_in_mask(nside, density_sqarcmin=10, thin=10):
     filename = "sim-fiducial/randoms.npy"
@@ -106,6 +113,7 @@ def random_points_in_mask(nside, density_sqarcmin=10, thin=10):
     rsub = {"ra": ra[::thin], "dec": dec[::thin]}
     return rcat, rsub
 
+
 def measure_xi(cat):
     c = treecorr.Catalog(
         ra=cat["ra"],
@@ -117,7 +125,7 @@ def measure_xi(cat):
     )
     config = {
         "min_sep": 0.5,
-        "max_sep": 300.,
+        "max_sep": 300.0,
         "nbins": 20,
         "bin_slop": 0.1,
         "sep_units": "arcmin",
@@ -128,12 +136,13 @@ def measure_xi(cat):
     gg.process(c)
     return gg
 
+
 def measure_w(lcat, rancat, rancatsub):
     c = treecorr.Catalog(
         ra=lcat["ra"],
         dec=lcat["dec"],
         ra_units="deg",
-        dec_units="deg",        
+        dec_units="deg",
     )
     r = treecorr.Catalog(
         ra=rancat["ra"],
@@ -149,7 +158,7 @@ def measure_w(lcat, rancat, rancatsub):
     )
     config = {
         "min_sep": 0.5,
-        "max_sep": 300.,
+        "max_sep": 300.0,
         "nbins": 20,
         "bin_slop": 0.1,
         "sep_units": "arcmin",
@@ -181,7 +190,7 @@ def measure_gammat(scat, lcat, rancat):
         ra=lcat["ra"],
         dec=lcat["dec"],
         ra_units="deg",
-        dec_units="deg",        
+        dec_units="deg",
     )
     r = treecorr.Catalog(
         ra=rancat["ra"],
@@ -191,7 +200,7 @@ def measure_gammat(scat, lcat, rancat):
     )
     config = {
         "min_sep": 0.5,
-        "max_sep": 300.,
+        "max_sep": 300.0,
         "nbins": 20,
         "bin_slop": 0.1,
         "sep_units": "arcmin",
@@ -208,6 +217,7 @@ def measure_gammat(scat, lcat, rancat):
 
     return ng
 
+
 def get_expected_xi():
     """
     Compute the theoretical correlation functions for the fiducial cosmology
@@ -220,11 +230,11 @@ def get_expected_xi():
 
     # Should be specifying these in the config - do that!
     import camb
+
     cp = camb.set_params()
     n_s = cp.InitPower.ns
 
     sample_info = ridge_sims.samples.load_sample_information(lens_type="maglim")
-
 
     cosmo = pyccl.Cosmology(Omega_c=Omega_c, Omega_b=Omega_b, h=h, sigma8=sigma8, n_s=n_s)
     stracer = pyccl.WeakLensingTracer(
@@ -233,10 +243,7 @@ def get_expected_xi():
     )
     bias = np.repeat(sample_info.galaxy_bias[0], len(sample_info.source_z))
     ltracer = pyccl.NumberCountsTracer(
-        cosmo,
-        dndz=(sample_info.lens_z, sample_info.lens_nz[0]),
-        bias=(sample_info.lens_z, bias),
-        has_rsd = False
+        cosmo, dndz=(sample_info.lens_z, sample_info.lens_nz[0]), bias=(sample_info.lens_z, bias), has_rsd=False
     )
     ell = np.arange(2, 5000)
     theta_arcmin = np.geomspace(1.0, 300.0, 100)
@@ -254,47 +261,45 @@ def get_expected_xi():
     return theta_arcmin, xi_plus, xi_minus, xi_density, xi_ggl
 
 
-
 def plot_shear(s0, theta_theory, xip_theory, xim_theory):
     xi = measure_xi(s0)
 
     # Shear plot
     plt.figure()
-    plt.errorbar(xi.meanr, xi.xip, xi.varxip**0.5, fmt='.', label='Measured xi+')
-    plt.errorbar(xi.meanr, xi.xim, xi.varxim**0.5, fmt='.', label='Measured xi-')
-    plt.plot(theta_theory, xip_theory, label='Theory xi+')
-    plt.plot(theta_theory, xim_theory, label='Theory xi-')
+    plt.errorbar(xi.meanr, xi.xip, xi.varxip**0.5, fmt=".", label="Measured xi+")
+    plt.errorbar(xi.meanr, xi.xim, xi.varxim**0.5, fmt=".", label="Measured xi-")
+    plt.plot(theta_theory, xip_theory, label="Theory xi+")
+    plt.plot(theta_theory, xim_theory, label="Theory xi-")
     plt.legend()
-    plt.xscale('log')
-    plt.yscale('log')
+    plt.xscale("log")
+    plt.yscale("log")
     plt.savefig("./sim-fiducial/xi.png")
     plt.close()
+
 
 def plot_w(l0, randoms, randoms_sub, theta_theory, w_theory):
     wtheta = measure_w(l0, randoms, randoms_sub)
     plt.figure()
-    plt.errorbar(wtheta.meanr, wtheta.xi, wtheta.varxi**0.5, fmt='.', label='Measured w(theta)')
-    plt.plot(theta_theory, w_theory, label='Theory w(theta)')
-    plt.yscale('log')
-    plt.xscale('log')
+    plt.errorbar(wtheta.meanr, wtheta.xi, wtheta.varxi**0.5, fmt=".", label="Measured w(theta)")
+    plt.plot(theta_theory, w_theory, label="Theory w(theta)")
+    plt.yscale("log")
+    plt.xscale("log")
     plt.legend()
     plt.savefig("./sim-fiducial/wtheta.png")
     plt.close()
 
+
 def plot_ggl(s0, l0, rancat, theta_theory, gammat_theory):
     gammat = measure_gammat(s0, l0, rancat)
     plt.figure()
-    plt.errorbar(gammat.meanr, gammat.xi, gammat.varxi**0.5, fmt='.', label='Measured gamma_t')
-    plt.plot(theta_theory, gammat_theory, label='Theory gamma_t')
-    plt.yscale('log')
-    plt.xscale('log')
+    plt.errorbar(gammat.meanr, gammat.xi, gammat.varxi**0.5, fmt=".", label="Measured gamma_t")
+    plt.plot(theta_theory, gammat_theory, label="Theory gamma_t")
+    plt.yscale("log")
+    plt.xscale("log")
     plt.legend()
     plt.savefig("./sim-fiducial/gammat.png")
     plt.close()
 
-
-
-    
 
 def correlation_functions(l0, s0):
     nside = 512
@@ -308,13 +313,12 @@ def correlation_functions(l0, s0):
     plot_ggl(s0, l0, rancat, theta_theory, gammat_theory)
 
 
-
 if __name__ == "__main__":
     l0 = np.load("./sim-fiducial/lens_catalog_0.hdf5")
     print("Loaded lens sample")
     s0 = np.load("./sim-fiducial/source_catalog_0.hdf5")
     print("Loaded shear sample")
-    #catalog_checks(l0, s0)
-    #redshift_histograms(l0, s0)
-    #make_maps(l0, s0)
+    # catalog_checks(l0, s0)
+    # redshift_histograms(l0, s0)
+    # make_maps(l0, s0)
     correlation_functions(l0, s0)

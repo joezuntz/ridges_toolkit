@@ -8,25 +8,26 @@ from .tree import make_tree, cut_points_with_tree
 from .scms import ridge_update, mesh_generation
 
 
-def find_filaments(coordinates, 
-              bandwidth = np.radians(0.5), 
-              convergence = np.radians(0.005),
-              max_unconverged_fraction = 0.005,
-              max_iterations = 5000,
-              num_ridge_points = None,
-              n_neighbors = 5000,
-              distance_metric = "haversine",
-              mesh_threshold = 4.0,
-              checkpoint_dir = None,
-              min_checkpoint_gap = 30,
-              resume = False,
-              seed = None,
-              tree_file = None,
-              comm = None,
-              weights = None,
-              ):
+def find_filaments(
+    coordinates,
+    bandwidth=np.radians(0.5),
+    convergence=np.radians(0.005),
+    max_unconverged_fraction=0.005,
+    max_iterations=5000,
+    num_ridge_points=None,
+    n_neighbors=5000,
+    distance_metric="haversine",
+    mesh_threshold=4.0,
+    checkpoint_dir=None,
+    min_checkpoint_gap=30,
+    resume=False,
+    seed=None,
+    tree_file=None,
+    comm=None,
+    weights=None,
+):
     """Estimate density rigdges for a user-provided dataset of coordinates.
-    
+
     This function uses an augmented version of the subspace-constrained mean
     shift algorithm to return density ridges for a set of user-provided
     coordinates. Apart from the haversine distance to compute a more accurate
@@ -38,17 +39,17 @@ def find_filaments(coordinates,
     assess when to terminate and the percentage indicating which top-level of
     filament points in high-density regions should be returned. If the latter
     is not chose, all filament points are returned in the output instead.
-    
+
     Parameters:
     -----------
     coordinates : array-like
         The set of latitudes and longitudes as an (npoint, 2) array of floats.
         In radians.
-        
+
     bandwidth : float
         The bandwidth used for weighting points in the ridge update.
         In radians
-    
+
     convergence : float
         The convergence threshold for the inter-iteration update difference.
         In radians.
@@ -61,17 +62,17 @@ def find_filaments(coordinates,
 
     max_iterations : int, defaults to 5000
         The maximum number of iterations to run before stopping.
-    
+
     num_ridge_points : int, defaults to None
         The number of mesh points to be used to generate ridges.
 
     n_neighbors : int, defaults to 5000
         The number of nearest neighbour points used to update ridge points.
         You should check convergence of this parameter for your use case.
-            
+
     distance_metric: string, defaults to 'haversine'
         The distance function to be used, can be 'haversine' or 'euclidean'.
-    
+
     mesh_threshold: float, defaults to 4.0
         Throw away initial mesh point more than this many bandwidths from any coordinate
 
@@ -114,10 +115,10 @@ def find_filaments(coordinates,
 
     initial_density : array
         The initial density of the mesh points before iterations.
-    
+
     final_density : array
         The final density of the ridge points after iterations.
-        
+
     Attributes:
     -----------
     None
@@ -132,11 +133,11 @@ def find_filaments(coordinates,
     is_root = comm is None or comm.rank == 0
     rank = 0 if comm is None else comm.rank
 
-    # make checkpointing directory if it does not exist
+    # make checkpointing directory if it does not exist
     if checkpoint_dir is not None and is_root:
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Only the root process makes the mesh and the tree, so that
+    # Only the root process makes the mesh and the tree, so that
     # every process is using the exact same one.
     if is_root:
         print("Generated mesh.  Making tree.")
@@ -146,31 +147,28 @@ def find_filaments(coordinates,
         # Make the ball tree to speed up finding nearby points
         tree = make_tree(coordinates, distance_metric, tree_file)
 
-
-        # remove any ridges that are more than mesh_threshold bandwidths from any point
-        # We do the cutting here on the root process so that each process actually does get the
-        # same number of points to work with.
+        # remove any ridges that are more than mesh_threshold bandwidths from any point
+        # We do the cutting here on the root process so that each process actually does get the
+        # same number of points to work with.
         print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
         ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
         print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
-    
+
     else:
-        # Other processes do not make them, but instead are sent them just below
-        # here
+        # Other processes do not make them, but instead are sent them just below
+        # here
         tree = None
         ridges = None
 
-
     if comm is not None:
         # These commands send a copy of the tree and the ridges
-        # to all the processes
+        # to all the processes
         tree = comm.bcast(tree, root=0)
         ridges = comm.bcast(ridges, root=0)
 
         # Split up the ridges so that each process gets an
-        # evenly sized subset.
+        # evenly sized subset.
         ridges = np.array_split(ridges, comm.size)[comm.rank]
-
 
     # Record the initial density of all the points to allow us to do cuts later
     initial_density = estimate_local_density(tree, ridges, bandwidth, weights)
@@ -178,11 +176,11 @@ def find_filaments(coordinates,
     # Loop over the number of prescripted iterations
     iteration_number = 0
 
-    # We keep track of which points need to be updated.
+    # We keep track of which points need to be updated.
     # Initially, all points are set to be updated.
     points_to_update = np.ones(ridges.shape[0], dtype=bool)
 
-    # Checkpoint 0 - initial random state of the points
+    # Checkpoint 0 - initial random state of the points
     checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
     time_of_last_checkpoint = timer()
 
@@ -198,7 +196,9 @@ def find_filaments(coordinates,
 
     # Wait until almost all points have converged. Towards the end the
     # points will be updating very quickly as there are so few of them.
-    while (iteration_number < max_iterations) and points_to_update.sum() > np.ceil(points_to_update.size * max_unconverged_fraction):
+    while (iteration_number < max_iterations) and points_to_update.sum() > np.ceil(
+        points_to_update.size * max_unconverged_fraction
+    ):
         # pull out the set of points that we want to update
         ridges_subset = ridges[points_to_update]
         subset_index = index[points_to_update]
@@ -208,11 +208,11 @@ def find_filaments(coordinates,
         updates = ridge_update(ridges_subset, coordinates, bandwidth, tree, n_neighbors)
         time_taken = timer() - t
 
-        # Copy the update from this set of ridges to the full set
+        # Copy the update from this set of ridges to the full set
         ridges[subset_index] = ridges_subset
 
         # Find which points have converged, and mark in the list of
-        # the full set of ridges that they have done so.
+        # the full set of ridges that they have done so.
         update_average = np.mean(updates)
         newly_converged_points = updates < convergence
         points_to_update[subset_index[newly_converged_points]] = False
@@ -220,12 +220,14 @@ def find_filaments(coordinates,
 
         # Report convergence progress.
         iteration_number += 1
-        print(f"[Proc {rank}]: iteration {iteration_number}  update change: {update_average:e} took {time_taken:.2f} seconds. {n_to_update} points left to converge.")
+        print(
+            f"[Proc {rank}]: iteration {iteration_number}  update change: {update_average:e} took {time_taken:.2f} seconds. {n_to_update} points left to converge."
+        )
         # It's worth running flush here as on some MPI systems this can actually force the write.  Not all though.
         sys.stdout.flush()
 
-        # The checkpointing is done independently for each MPI
-        # process. This means you need to use the same number of
+        # The checkpointing is done independently for each MPI
+        # process. This means you need to use the same number of
         # processes when resuming a run as you did when starting it,
         # but it also avoids requiring any synchronization.
         if checkpoint_dir is not None:
@@ -235,7 +237,7 @@ def find_filaments(coordinates,
                 checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
 
     # We also record the density at the end of the iterations - we may want to cut
-    # to high density ridges only.
+    # to high density ridges only.
     final_density = estimate_local_density(tree, ridges, bandwidth, weights)
 
     if comm is not None:
@@ -248,7 +250,6 @@ def find_filaments(coordinates,
             initial_density = np.concatenate(initial_density)
             final_density = np.concatenate(final_density)
 
-
     # Return the iteratively updated mesh as the density ridges
     if is_root:
         print("\nDone!")
@@ -260,21 +261,20 @@ def estimate_local_density(tree, coordinates, bandwidth, weights=None):
     if weights is None:
         return tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=True)
 
-    nearby_points = tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=False)    
+    nearby_points = tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=False)
     return np.array([weights[points].sum() for points in nearby_points])
-
 
 
 def parameter_check(**p):
     """Check the main function inputs for unsuitable formats or values.
-    
-    This function checks all of the user-provided main function inputs for 
+
+    This function checks all of the user-provided main function inputs for
     their suitability to be used by the code. This is done right at the
     top of the main function to catch input errors early and before any
     time is spent on time-consuming computations. Each faulty input is
     identified, and a customized error message is printed for the user
     to inform about the correct inputs before the code is terminated.
-    
+
     Parameters:
     -----------
     p : dict
@@ -294,19 +294,18 @@ def parameter_check(**p):
     tree_file = p["tree_file"]
     comm = p["comm"]
 
-
     # Check whether two-dimensional coordinates are provided
     if not (isinstance(coordinates, np.ndarray) and coordinates.ndim == 2 and coordinates.shape[1] == 2):
         raise ValueError("ERROR: coordinates must be a 2-column numpy.ndarray with second dimension 2 (dec, ra)")
-    
+
     if np.any(coordinates > 2 * np.pi) or np.any(coordinates < -2 * np.pi):
         raise ValueError("ERROR: coordinates must be in radians. ")
-    
+
     if np.any(np.isnan(coordinates)) or np.any(np.isinf(coordinates)):
         raise ValueError("ERROR: coordinates must not contain NaN or Inf values.")
 
     # Check whether neighbors is a positive integer or float
-    if not (isinstance(n_neighbours, int) and  n_neighbours > 0):
+    if not (isinstance(n_neighbours, int) and n_neighbours > 0):
         raise ValueError("ERROR: n_neighbors must be an integer > 0")
 
     # Check whether bandwidth is a positive float
@@ -316,7 +315,7 @@ def parameter_check(**p):
     # Check whether convergence is a positive float
     if not (isinstance(convergence, float) and convergence > 0):
         raise ValueError("ERROR: convergence must be a positive integer or float")
-    
+
     # Check whether num_ridge_points is a positive integer
     if not (isinstance(num_ridge_points, int) and num_ridge_points > 0):
         raise ValueError("ERROR: num_ridge_points must be a positive integer")
@@ -332,20 +331,19 @@ def parameter_check(**p):
     # Check whether checkpoint_dir is a string or None
     if checkpoint_dir is not None and not isinstance(checkpoint_dir, str):
         raise ValueError("ERROR: checkpoint_dir must be a string or None")
-    
+
     # Check whether resume is a boolean
     if not isinstance(resume, bool):
         raise ValueError("ERROR: resume must be a boolean")
-    
+
     # Check whether seed is an integer or None
     if seed is not None and not isinstance(seed, int):
         raise ValueError("ERROR: seed must be an integer or None")
-    
+
     # Check whether tree_file is a string or None
     if tree_file is not None and not isinstance(tree_file, str):
         raise ValueError("ERROR: tree_file must be a string or None")
-    
-    # Check whether comm is None or an MPI communicator
-    if comm is not None and not hasattr(comm, 'rank'):
-        raise ValueError("ERROR: comm must be None or an MPI communicator (e.g., from mpi4py)")
 
+    # Check whether comm is None or an MPI communicator
+    if comm is not None and not hasattr(comm, "rank"):
+        raise ValueError("ERROR: comm must be None or an MPI communicator (e.g., from mpi4py)")

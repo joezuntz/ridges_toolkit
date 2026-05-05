@@ -2,6 +2,7 @@ import os
 import numpy as np
 import re
 
+
 def load_ridge_state(checkpoint_dir, comm):
     """
     Load the last saved ridge state from the specified directory.
@@ -22,14 +23,14 @@ def load_ridge_state(checkpoint_dir, comm):
     """
     rank = 0 if comm is None else comm.rank
 
-    # All files in the checkpoint dir. Below we will filter them
+    # All files in the checkpoint dir. Below we will filter them
     files = os.listdir(checkpoint_dir)
 
     # filter to find files that match the pattern 'ridges_<number>_<rank>.npz'
     # i.e. for this rank find the most recent checkpoint file
     checkpoint_iteration = -1
     for f in files:
-        match = re.match(fr'ridges_(\d+)_{rank}\.npz', f)
+        match = re.match(rf"ridges_(\d+)_{rank}\.npz", f)
         if match:
             checkpoint_iteration = max(checkpoint_iteration, int(match.group(1)))
 
@@ -38,14 +39,13 @@ def load_ridge_state(checkpoint_dir, comm):
         filename = f"{checkpoint_dir}/ridges_{checkpoint_iteration}_{rank}.npz"
         print(f"Loading ridge state from {filename} for rank {rank}.")
         ridges_data = np.load(filename)
-        state = ridges_data['ridges'], ridges_data['points_to_update'], checkpoint_iteration + 1
+        state = ridges_data["ridges"], ridges_data["points_to_update"], checkpoint_iteration + 1
 
     else:
         print(f"Warning: No ridge state files found in {checkpoint_dir} for rank {rank} so cannot resume iterations.")
         state = None
 
     return state
-
 
 
 def checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm):
@@ -74,6 +74,6 @@ def checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
     if checkpoint_dir is None:
         return
 
-    # If needed, collect together ridge information
+    # If needed, collect together ridge information
     rank = 0 if comm is None else comm.rank
     np.savez(f"{checkpoint_dir}/ridges_{iteration_number}_{rank}.npz", ridges=ridges, points_to_update=points_to_update)

@@ -5,8 +5,7 @@ from numba import njit, prange
 from numba.core.errors import NumbaPerformanceWarning
 
 # Suppress Numba performance warnings
-warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
-
+warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
 
 def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors, weights=None):
@@ -14,7 +13,9 @@ def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors, weights=None
     if weights is None:
         updates = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances)
     else:
-        updates = weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights)
+        updates = weighted_ridge_update_inner(
+            ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights
+        )
     return updates
 
 
@@ -29,13 +30,14 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
         nearby_indices = all_nearby_indices[i]
         distance = all_distances[i]
         nearby_coordinates = coordinates[nearby_indices].copy()
-    
+
         updates[i] = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
 
         # Store the change between updates to check convergence
         update_sizes[i] = np.sum(np.abs(updates[i]))
     ridges += updates
     return update_sizes
+
 
 @njit(parallel=True)
 def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights):
@@ -48,10 +50,10 @@ def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indic
         nearby_indices = all_nearby_indices[i]
         distance = all_distances[i]
         # I don't recall why we are copying these. Maybe for
-        # contiguity?
+        # contiguity?
         nearby_coordinates = coordinates[nearby_indices].copy()
         nearby_weights = weights[nearby_indices].copy()
-    
+
         updates[i] = weighted_update_function(ridges[i], nearby_coordinates, bandwidth, distance, nearby_weights)
 
         # Store the change between updates to check convergence
@@ -60,24 +62,22 @@ def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indic
     return update_sizes
 
 
-
-
 @njit
 def update_function(point, coordinates, bandwidth, distance):
     """Calculate the mean shift update for a provided mesh point.
-    
-    This function calculates the mean shift update for a given point of 
+
+    This function calculates the mean shift update for a given point of
     the mesh at the current iteration. This is done through a spectral
     decomposition of the local inverse covariance matrix, shifting the
     respective point closer towards the nearest estimated ridge. The
     updates are provided as a tuple in the latitude-longitude space to
     be added to the point's coordinate values.
-    
+
     Parameters:
     -----------
     point : array-like
         The latitude-longitude coordinate tuple for a single mesh point.
-        
+
     coordinates : array-like
         The set of latitudes and longitudes as a two-column array of floats.
 
@@ -86,17 +86,17 @@ def update_function(point, coordinates, bandwidth, distance):
 
     distance : array-like
         Pre-computed distances between the mesh point and the dataset.
-        
+
     Returns:
     --------
     point_updates : float
         The tuple of latitude and longitude updates for the mesh point.
-        
+
     Attributes:
     -----------
     None
     """
-    squared_distance = distance ** 2
+    squared_distance = distance**2
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth)
     # now reweight each point
@@ -113,7 +113,7 @@ def update_function(point, coordinates, bandwidth, distance):
     # Cut the eigenvectors according to the sorted eigenvalues
     cut_eigen_vectors = eigen_vectors[:, 1:]
     # Project the update to the eigenvector-spanned orthogonal subspace
-    point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)    
+    point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)
     # Return the projections as the point updates
     return point_updates
 
@@ -121,19 +121,19 @@ def update_function(point, coordinates, bandwidth, distance):
 @njit
 def weighted_update_function(point, coordinates, bandwidth, distance, sample_weights):
     """Calculate the mean shift update for a provided mesh point.
-    
-    This function calculates the mean shift update for a given point of 
+
+    This function calculates the mean shift update for a given point of
     the mesh at the current iteration. This is done through a spectral
     decomposition of the local inverse covariance matrix, shifting the
     respective point closer towards the nearest estimated ridge. The
     updates are provided as a tuple in the latitude-longitude space to
     be added to the point's coordinate values.
-    
+
     Parameters:
     -----------
     point : array-like
         The latitude-longitude coordinate tuple for a single mesh point.
-        
+
     coordinates : array-like
         The set of latitudes and longitudes as a two-column array of floats.
 
@@ -146,17 +146,17 @@ def weighted_update_function(point, coordinates, bandwidth, distance, sample_wei
     sample_weights : array-like
         The weights for each point in the dataset, to be used for a weighted update.
 
-        
+
     Returns:
     --------
     point_updates : float
         The tuple of latitude and longitude updates for the mesh point.
-        
+
     Attributes:
     -----------
     None
     """
-    squared_distance = distance ** 2
+    squared_distance = distance**2
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth) * sample_weights
     # now reweight each point
@@ -173,31 +173,31 @@ def weighted_update_function(point, coordinates, bandwidth, distance, sample_wei
     # Cut the eigenvectors according to the sorted eigenvalues
     cut_eigen_vectors = eigen_vectors[:, 1:]
     # Project the update to the eigenvector-spanned orthogonal subspace
-    point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)    
+    point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)
     # Return the projections as the point updates
     return point_updates
 
 
 @njit
-def gaussian_kernel(values,  bandwidth):
+def gaussian_kernel(values, bandwidth):
     """Calculate the Gaussian kernel evaluation of distance values.
-    
+
     This function evaluates a Gaussian kernel for the squared distances
     between a mesh point and the dataset, and for a given bandwidth.
-    
+
     Parameters:
     -----------
     values : array-like
         The squared distances between a mesh point and provided coordinates.
-    
+
     bandwidth : float
         The bandwidth used for kernel density estimates of data points.
-        
+
     Returns:
     --------
     kernel_value : float
         The Gaussian kernel evaluations for the given distances.
-        
+
     Attributes:
     -----------
     None
@@ -205,6 +205,7 @@ def gaussian_kernel(values,  bandwidth):
     # Compute the kernel value for the given values
     kernel_value = np.exp(-0.5 * values / bandwidth**2)
     return kernel_value
+
 
 @njit
 def mean1(a):
@@ -214,7 +215,7 @@ def mean1(a):
     This is needed because the Numba JIT compiler does not support
     the numpy.mean function with axis argument, so we implement it
     manually.
-    
+
     """
     n1, n2 = a.shape
     res = np.zeros(n1)
@@ -222,45 +223,43 @@ def mean1(a):
         res[i] = np.sum(a[i, :]) / n2
     return res
 
+
 @njit
-def local_inv_cov(point, 
-                  coordinates, 
-                  bandwidth):
+def local_inv_cov(point, coordinates, bandwidth):
     """Compute the local inverse covariance from the gradient and Hessian.
-    
+
     This function computes the local inverse covariance matrix for a given
     mesh point and the provided dataset, using a given bandwidth. In order
     to reach this result, the covariance matrix for the distances between
     a mesh point and the dataset is calculated. After that, the Hessian
     matrix is used to calculate the gradient at the given point's location.
     Finally, the latter is used to arrive at the local inverse covariance.
-    
+
     Parameters:
     -----------
     point : array-like
         The latitude-longitude coordinate tuple for a single mesh point.
-    
+
     coordinates : array-like
         The set of latitudes and longitudes as a two-column array of floats.
-    
+
     bandwidth : float
         The bandwidth used for kernel density estimates of data points.
-        
+
     Returns:
     --------
     inverse_covariance : array-like
         The local inverse covariance for the given point and coordinates.
-        
+
     Attributes:
     -----------
     None
     """
 
-
-    number_points, number_columns = coordinates.shape 
+    number_points, number_columns = coordinates.shape
 
     # Calculate the squared distance between points
-    squared_distance = np.sum((coordinates - point)**2, axis=1)
+    squared_distance = np.sum((coordinates - point) ** 2, axis=1)
     # Compute the weight kernels called b_j in the paper
     weights = gaussian_kernel(squared_distance, bandwidth)
     weight_sum = np.sum(weights)
@@ -280,12 +279,9 @@ def local_inv_cov(point,
     return inv_cov
 
 
-
-
-
 def mesh_generation(coordinates, num_ridge_points, seed=None):
     """Generate a set of uniformly-random distributed points as a mesh.
-    
+
     The subspace-constrained mean shift algorithm operates on either a grid
     or a uniform-random set of coordinates to iteratively shift them towards
     the estimated density ridges. Due to the functionality of the code, the
@@ -295,23 +291,23 @@ def mesh_generation(coordinates, num_ridge_points, seed=None):
     of the mesh is constrained to a lower limit of 50,000 and an upper limit
     of 100,000, with the size of the provided dataset being used if it falls
     within these limits. This is done to avoid overly long running times.
-    
+
     Parameters:
     -----------
     coordinates : array-like
         The set of latitudes and longitudes as a two-column array of floats.
-    
+
     num_ridge_points : int
         The number of mesh points to be used to generate ridges.
-    
+
     seed: int, optional
         If provided, sets the random seed for reproducibility.
-        
+
     Returns:
     --------
     mesh : array-like
         The set of uniform-random coordinates in the dataset's intervals.
-        
+
     Attributes:
     -----------
     None

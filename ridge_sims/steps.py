@@ -1,7 +1,7 @@
 import sys
 import os
 import numpy as np
-from .samples import load_sample_information_advanced,load_sample_information, load_mask
+from .samples import load_sample_information_advanced, load_sample_information, load_mask
 from .ridge_sims import (
     shell_configuration,
     generate_shell_cl,
@@ -13,8 +13,6 @@ from .config import Config
 from .tools import flush
 import pickle
 import multiprocessing
-
-
 
 
 def step1(config):
@@ -55,7 +53,7 @@ def step2(config):
 
     if config.nprocess > 1:
         pool = multiprocessing.Pool(config.nprocess)
-    else:   
+    else:
         pool = None
 
     generate_lognormal_gls(shell_cl, config.g_ell_file, config.nside, config.lmax, pool=pool)
@@ -87,7 +85,7 @@ def step3(config, sigma_e_default=1e-3):
         print("Shape noise disabled: setting sigma_e[:] = 1e-3")
         sample.sigma_e[:] = np.full_like(sample.sigma_e, sigma_e_default)
 
-    # Load the results of the previous step
+    # Load the results of the previous step
     with open(config.g_ell_file, "rb") as f:
         gls = pickle.load(f)
 
@@ -98,4 +96,15 @@ def step3(config, sigma_e_default=1e-3):
     _, cosmo = get_parameter_objects(config.h, config.Omega_m, config.Omega_b, config.sigma8)
 
     # Simulate the catalogs
-    simulate_catalogs(gls, rng, cosmo, sample, mask, config.nside, config.source_cat_file, config.lens_cat_file, config.zmax, config.dx)
+    simulate_catalogs(
+        gls,
+        rng,
+        cosmo,
+        sample,
+        mask,
+        config.nside,
+        config.source_cat_file,
+        config.lens_cat_file,
+        config.zmax,
+        config.dx,
+    )

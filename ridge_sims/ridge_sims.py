@@ -8,30 +8,29 @@ import tqdm
 import h5py
 from .tools import flush
 
+
 def get_parameter_objects(h, Omega_m, Omega_b, sigma_8):
-    omch2 = (Omega_m - Omega_b) * (h ** 2)
-    ombh2 = Omega_b * (h ** 2)
+    omch2 = (Omega_m - Omega_b) * (h**2)
+    ombh2 = Omega_b * (h**2)
     As = 2.1e-9
     H0 = 100 * h
     # get a CAMB parameter object and a glass Cosmology object
-    pars = camb.set_params(H0=H0, omch2=omch2, ombh2=ombh2, As=As,
-                        NonLinear=camb.model.NonLinear_both, WantTransfer=True)
+    pars = camb.set_params(
+        H0=H0, omch2=omch2, ombh2=ombh2, As=As, NonLinear=camb.model.NonLinear_both, WantTransfer=True
+    )
     r = camb.get_results(pars)
 
     # CAMB takes the primordial A_s parameter as its input,
     # but we want to use the late-time sigma_8 parameter instead.
     # So we run CAMB once to get the sigma_8 for a fiducial A_s,
-    # and then re-scale A_s
-    As *= sigma_8 ** 2 / r.get_sigma8_0() ** 2
+    # and then re-scale A_s
+    As *= sigma_8**2 / r.get_sigma8_0() ** 2
 
-    pars = camb.set_params(H0=H0, omch2=omch2, ombh2=ombh2, As=As,
-                        NonLinear=camb.model.NonLinear_both)
+    pars = camb.set_params(H0=H0, omch2=omch2, ombh2=ombh2, As=As, NonLinear=camb.model.NonLinear_both)
 
     cosmo = Cosmology.from_camb(pars)
 
     return pars, cosmo
-
-
 
 
 def generate_shell_cl(windows, h, Omega_m, Omega_b, sigma8, filename, lmax):
@@ -52,7 +51,7 @@ def generate_lognormal_gls(shell_cl, g_ell_file, nside, lmax, pool=None):
 
     with open(g_ell_file, "wb") as f:
         pickle.dump(gls, f)
-    
+
     return gls
 
 
@@ -61,16 +60,19 @@ def generate_matter_fields(gls, rng, nside):
     matter = glass.generate_lognormal(gls, nside, ncorr=3, rng=rng)
     return matter
 
+
 def shell_configuration(cosmo, zmax, dx):
-    zgrid = glass.shells.distance_grid(cosmo, 0., zmax, dx=dx)
+    zgrid = glass.shells.distance_grid(cosmo, 0.0, zmax, dx=dx)
     windows = glass.shells.linear_windows(zgrid)
     return windows
 
 
-def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, shell_ngal, shell_bias, sigma_e, mask, rng):
-    
+def generate_shell_source_sample(
+    delta_i, kappa_map, g1_map, g2_map, window, shell_ngal, shell_bias, sigma_e, mask, rng
+):
+
     # compute the lensing maps for this shell
-    dtype=[
+    dtype = [
         ("ra", float),
         ("dec", float),
         ("z", float),
@@ -80,15 +82,15 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
     ]
 
     catalog = []
-    
+
     # generate source galaxies
     for gal_lon, gal_lat, gal_count in glass.positions_from_delta(
         shell_ngal,
         delta_i,
-        shell_bias, # this shouldn't actually matter for the source sample
+        shell_bias,  # this shouldn't actually matter for the source sample
         vis=mask,
         rng=rng,
-    ):  
+    ):
         print("made source chunk of size", gal_count)
         gal_z = glass.redshifts(gal_count, window, rng=rng)
         # generate galaxy ellipticities from the chosen distribution
@@ -119,18 +121,17 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
     return np.concatenate(catalog)
 
 
-
 def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rng):
-    
+
     # compute the lensing maps for this shell
-    dtype=[
+    dtype = [
         ("ra", float),
         ("dec", float),
         ("z", float),
     ]
 
     catalog = []
-    
+
     # generate lens galaxies
     for gal_lon, gal_lat, gal_count in glass.positions_from_delta(
         shell_ngal,
@@ -141,7 +142,7 @@ def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rn
     ):
         # Something weird in healpix.randang means that in some latitudes we get longitudes
         # in different ranges than others: https://github.com/ntessore/healpix/issues/101
-        # For consistency we normalize them all here.
+        # For consistency we normalize them all here.
         gal_lon = gal_lon % 360
         print("made lens chunk of size", gal_count)
         gal_z = glass.redshifts(gal_count, window, rng=rng)
@@ -160,10 +161,6 @@ def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rn
     return np.concatenate(catalog)
 
 
-
-
-
-
 def simulate_catalogs(gls, rng, cosmo, sample, mask, nside, source_cat_file, lens_cat_file, zmax, dx):
     # Generate the iterator that produces the matter fields
     matter = generate_matter_fields(gls, rng, nside)
@@ -174,13 +171,9 @@ def simulate_catalogs(gls, rng, cosmo, sample, mask, nside, source_cat_file, len
 
     # distribute the n(z) for this bin over the
     source_ngal_per_shell = [
-        glass.partition(sample.source_z, sample.source_nz[b], windows)
-        for b in range(sample.nbin_source)
+        glass.partition(sample.source_z, sample.source_nz[b], windows) for b in range(sample.nbin_source)
     ]
-    lens_ngal_per_shell = [
-        glass.partition(sample.lens_z, sample.lens_nz[b], windows)
-        for b in range(sample.nbin_lens)
-    ]
+    lens_ngal_per_shell = [glass.partition(sample.lens_z, sample.lens_nz[b], windows) for b in range(sample.nbin_lens)]
 
     source_catalogs = [[] for _ in range(sample.nbin_source)]
     lens_catalogs = [[] for _ in range(sample.nbin_lens)]
@@ -242,6 +235,6 @@ def save_structured_array_hdf5(data, filename):
     filename : str
         The name of the file to save to.
     """
-    with h5py.File(filename, 'w') as f:
+    with h5py.File(filename, "w") as f:
         for name in data.dtype.names:
             f.create_dataset(name, data=data[name])

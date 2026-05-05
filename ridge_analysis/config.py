@@ -2,17 +2,18 @@ import dataclasses
 import yaml
 import numpy as np
 
+
 @dataclasses.dataclass(kw_only=True)
 class Config:
-    # The dataclass decorator auto-creates an __init__ method and other utility methods.
+    # The dataclass decorator auto-creates an __init__ method and other utility methods.
     def to_yaml(self, filename):
         d = dataclasses.asdict(self)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             yaml.dump(d, f)
-    
+
     @classmethod
     def from_yaml(cls, filename):
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             d = yaml.safe_load(f)
         return cls(**d)
 
@@ -25,17 +26,16 @@ class DredgeConfig:
     bandwidth: float = 6.0  # in arcmin
     num_ridge_points: int = 500_000
     neighbours: int = 5000
-    convergence: float = 0.03 # in arcmin
+    convergence: float = 0.03  # in arcmin
     seed: int = 0
     lens_zmin: float = 0.0
     lens_zmax: float = 100.0
     # Whether to shift longitudes to avoid 0/360 degree boundary issues
-    shift_180: bool = False 
-
+    shift_180: bool = False
 
     def bandwidth_radians(self):
         return np.radians(self.bandwidth / 60.0)
-    
+
     def convergence_radians(self):
         return np.radians(self.convergence / 60.0)
 
