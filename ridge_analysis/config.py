@@ -29,6 +29,8 @@ class DredgeConfig:
     seed: int = 0
     lens_zmin: float = 0.0
     lens_zmax: float = 100.0
+    # Whether to shift longitudes to avoid 0/360 degree boundary issues
+    shift_180: bool = False 
 
 
     def bandwidth_radians(self):
@@ -48,7 +50,9 @@ class SegmentationConfig:
 
 @dataclasses.dataclass(kw_only=True)
 class ShearConfig:
+    output_shear_file: str
     source_catalog_file: str
+    ridge_file: str
     shear_file: str
     flip_g1: bool = False
     flip_g2: bool = False

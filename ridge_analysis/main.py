@@ -11,7 +11,7 @@ from .config import DredgeConfig, SegmentationConfig, ShearConfig
 ##############################################################
 
 def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
-    from .. import dredge
+    import dredge
     # In Dredge every rank needs the whole catalog, and the splitting is done
     # over the mesh points. We could certainly improve this if needed by giving
     # each rank only the lens catalog nearby its mesh points, but for now we
@@ -23,12 +23,23 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
     if dredge_config.lens_zmin is not None or dredge_config.lens_zmax is not None:
         lens_catalog.cut_to_redshift_range(dredge_config.lens_zmin, dredge_config.lens_zmax)
 
+    coordinates = lens_catalog.dec_ra_in_radians()
+    if dredge_config.shift_180:
+        coordinates[:, 1] = (coordinates[:, 1] + np.pi) % (2 * np.pi)
+        if comm is None or comm.rank == 0:
+            print("Shifting longitudes to avoid 0/360 degree boundary issues")
+            print("New RA range:", np.degrees(coordinates[:, 1].min()), np.degrees(coordinates[:, 1].max()))
+
+    # temporary
+    print("Using", len(coordinates), "galaxies for ridge finding")
+
+
     # Run the filament finder with the given configuration.
     # This will save checkpoints to the specified directory, and resume from them if they exist,
     # so be careful to delete them if you change the configuration and want to re-run in the 
     # same directory.
     ridges, _, final_density = dredge.find_filaments(
-        lens_catalog.dec_ra_in_radians(),
+        coordinates,
         bandwidth=dredge_config.bandwidth_radians(),
         convergence=dredge_config.convergence_radians(),
         distance_metric='haversine',
@@ -42,11 +53,19 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
 
 
     if comm is None or comm.rank == 0:
+        if dredge_config.shift_180:
+            # undo the shift
+            ridges[:, 1] = (ridges[:, 1] - np.pi) % (2 * np.pi)
+            if comm is None or comm.rank == 0:
+                print("Shifting ridge points back to original RA range")
+                print("Ridge RA range:", np.degrees(ridges[:, 1].min()), np.degrees(ridges[:, 1].max()))
         output = RidgePointCatalog(dredge_config.ridge_point_file)
         output.set_column("density", final_density)
         output.set_column("ra", np.degrees(ridges[:, 1]))
         output.set_column("dec", np.degrees(ridges[:, 0]))
         output.save()
+    else:
+        output = None
 
     return output
 
@@ -81,7 +100,7 @@ def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatal
     output.save()
     return output
 
-def measure_ridge_shear(source_catalog: SourceCatalog, shear_config: ShearConfig):
+def measure_ridge_shear(shear_config: ShearConfig):
 
     ridge_segments = RidgeSegmentCatalog(shear_config.ridge_file)
     ridge_segments.load()
@@ -104,7 +123,7 @@ def measure_ridge_shear(source_catalog: SourceCatalog, shear_config: ShearConfig
                   min_filament_points=shear_config.min_filament_points
     )
 
-    shear_table.save(shear_config.output_shear_file)
+    shear_table.save()
     return shear_table
 
 

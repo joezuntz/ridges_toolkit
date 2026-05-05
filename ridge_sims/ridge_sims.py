@@ -76,6 +76,7 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
         ("z", float),
         ("g1", float),
         ("g2", float),
+        ("weight", float),
     ]
 
     catalog = []
@@ -108,6 +109,7 @@ def generate_shell_source_sample(delta_i, kappa_map, g1_map, g2_map, window, she
         rows["z"] = gal_z
         rows["g1"] = gal_she.real
         rows["g2"] = gal_she.imag
+        rows["weight"] = np.ones(gal_count)
 
         catalog.append(rows)
 
@@ -137,6 +139,10 @@ def generate_shell_lens_sample(delta_i, window, shell_ngal, shell_bias, mask, rn
         vis=mask,
         rng=rng,
     ):
+        # Something weird in healpix.randang means that in some latitudes we get longitudes
+        # in different ranges than others: https://github.com/ntessore/healpix/issues/101
+        # For consistency we normalize them all here.
+        gal_lon = gal_lon % 360
         print("made lens chunk of size", gal_count)
         gal_z = glass.redshifts(gal_count, window, rng=rng)
         # generate galaxy ellipticities from the chosen distribution

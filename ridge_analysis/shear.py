@@ -5,6 +5,7 @@ import healpy as hp
 from sklearn.neighbors import NearestNeighbors
 from .io import ShearMeasurement
 from astropy.coordinates import SkyCoord
+from astropy import units as u
 
 
 def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
@@ -77,31 +78,28 @@ def get_nearby_sources(raf, decf, pixel_regions, nside_coverage):
     dec = []
     g1 = []
     g2 = []
-    z = []
     weight = []
 
     for p in pixels_needed:
         if p in pixel_regions:
-            ras_s, decs_s, g1_s, g2_s, z_s, w_s  = pixel_regions[p]
+            ras_s, decs_s, g1_s, g2_s, w_s  = pixel_regions[p]
             ra.append(ras_s)
             dec.append(decs_s)
             g1.append(g1_s)
             g2.append(g2_s)
-            z.append(z_s)
             weight.append(w_s)
 
     if len(ra) == 0:
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None
 
     ra = np.concatenate(ra)
     dec = np.concatenate(dec)
     g1 = np.concatenate(g1)
     g2 = np.concatenate(g2)
-    z = np.concatenate(z)
     weight = np.concatenate(weight)
     source_coords = np.array([dec, ra]).T
 
-    return source_coords, ra, dec, g1, g2, z, weight
+    return source_coords, ra, dec, g1, g2, weight
 
 
 
