@@ -30,9 +30,6 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
             print("Shifting longitudes to avoid 0/360 degree boundary issues")
             print("New RA range:", np.degrees(coordinates[:, 1].min()), np.degrees(coordinates[:, 1].max()))
 
-    # temporary
-    print("Using", len(coordinates), "galaxies for ridge finding")
-
 
     # Run the filament finder with the given configuration.
     # This will save checkpoints to the specified directory, and resume from them if they exist,

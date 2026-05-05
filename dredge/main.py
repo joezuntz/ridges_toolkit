@@ -1,10 +1,12 @@
 import os
 import sys
 from timeit import default_timer as timer
+from dredge import bandwidth
 import numpy as np
 from .checkpoints import checkpoint, load_ridge_state
 from .tree import make_tree, cut_points_with_tree
 from .scms import ridge_update, mesh_generation
+from dredge import tree
 
 
 def find_filaments(coordinates, 
@@ -22,6 +24,7 @@ def find_filaments(coordinates,
               seed = None,
               tree_file = None,
               comm = None,
+              weights = None,
               ):
     """Estimate density rigdges for a user-provided dataset of coordinates.
     
@@ -40,7 +43,7 @@ def find_filaments(coordinates,
     Parameters:
     -----------
     coordinates : array-like
-        The set of latitudes and longitudes as a two-column array of floats.
+        The set of latitudes and longitudes as an (npoint, 2) array of floats.
         In radians.
         
     bandwidth : float
@@ -99,6 +102,11 @@ def find_filaments(coordinates,
     comm: mpi4py.MPI.Comm, defaults to None
         If provided, the MPI communicator to use for parallel processing.
         If None, the function will run in single-process mode.
+
+    weights: None or array-like, defaults to None
+        If provided, an array of weights for the input coordinates. This can be used to give
+        more importance to certain points in the ridge estimation. The array should have the
+        same length as the number of input coordinates.
 
     Returns:
     --------
@@ -166,7 +174,7 @@ def find_filaments(coordinates,
 
 
     # Record the initial density of all the points to allow us to do cuts later
-    initial_density = tree.query_radius(ridges, r=bandwidth, return_distance=False, count_only=True)
+    initial_density = estimate_local_density(tree, ridges, weights)
 
     # Loop over the number of prescripted iterations
     iteration_number = 0
@@ -227,7 +235,7 @@ def find_filaments(coordinates,
 
     # We also record the density at the end of the iterations - we may want to cut
     # to high density ridges only.
-    final_density = tree.query_radius(ridges, r=bandwidth, return_distance=False, count_only=True)
+    final_density = estimate_local_density(tree, ridges, weights)
 
     if comm is not None:
         ridges = comm.gather(ridges)
@@ -245,6 +253,14 @@ def find_filaments(coordinates,
         print("\nDone!")
 
     return ridges, initial_density, final_density
+
+
+def estimate_local_density(tree, coordinates, weights=None):
+    nearby_points = tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=False)    
+    if weights is None:
+        return np.array([len(points) for points in nearby_points])
+    else:
+        return np.array([weights[points].sum() for points in nearby_points])
 
 
 

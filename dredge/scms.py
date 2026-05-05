@@ -9,9 +9,12 @@ warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 
 
 
-def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors):
+def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors, weights=None):
     all_nearby_indices, all_distances = query_tree(tree, ridges, n_neighbors)
-    updates = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances)
+    if weights is None:
+        updates = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances)
+    else:
+        updates = weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights)
     return updates
 
 
@@ -28,6 +31,28 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
         nearby_coordinates = coordinates[nearby_indices].copy()
     
         updates[i] = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
+
+        # Store the change between updates to check convergence
+        update_sizes[i] = np.sum(np.abs(updates[i]))
+    ridges += updates
+    return update_sizes
+
+@njit(parallel=True)
+def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights):
+    # Create a list to store all update values
+    update_sizes = np.zeros(ridges.shape[0])
+    updates = np.zeros(ridges.shape)
+    for i in prange(ridges.shape[0]):
+        # Compute the update movements for each point
+        # get all the points within the 3 sigma bandwidth
+        nearby_indices = all_nearby_indices[i]
+        distance = all_distances[i]
+        # I don't recall why we are copying these. Maybe for
+        # contiguity?
+        nearby_coordinates = coordinates[nearby_indices].copy()
+        nearby_weights = weights[nearby_indices].copy()
+    
+        updates[i] = weighted_update_function(ridges[i], nearby_coordinates, bandwidth, distance, nearby_weights)
 
         # Store the change between updates to check convergence
         update_sizes[i] = np.sum(np.abs(updates[i]))
@@ -91,6 +116,67 @@ def update_function(point, coordinates, bandwidth, distance):
     point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)    
     # Return the projections as the point updates
     return point_updates
+
+
+@njit
+def weighted_update_function(point, coordinates, bandwidth, distance, sample_weights):
+    """Calculate the mean shift update for a provided mesh point.
+    
+    This function calculates the mean shift update for a given point of 
+    the mesh at the current iteration. This is done through a spectral
+    decomposition of the local inverse covariance matrix, shifting the
+    respective point closer towards the nearest estimated ridge. The
+    updates are provided as a tuple in the latitude-longitude space to
+    be added to the point's coordinate values.
+    
+    Parameters:
+    -----------
+    point : array-like
+        The latitude-longitude coordinate tuple for a single mesh point.
+        
+    coordinates : array-like
+        The set of latitudes and longitudes as a two-column array of floats.
+
+    bandwidth : float
+        The bandwidth used for the update.
+
+    distance : array-like
+        Pre-computed distances between the mesh point and the dataset.
+
+    sample_weights : array-like
+        The weights for each point in the dataset, to be used for a weighted update.
+
+        
+    Returns:
+    --------
+    point_updates : float
+        The tuple of latitude and longitude updates for the mesh point.
+        
+    Attributes:
+    -----------
+    None
+    """
+    squared_distance = distance ** 2
+    # evaluate the kernel at each distance
+    weights = gaussian_kernel(squared_distance, bandwidth) * sample_weights
+    # now reweight each point
+    shift = coordinates.T @ weights / np.sum(weights)
+    # first, we evaluate the mean shift update
+    update = shift - point
+    # Calculate the local inverse covariance for the decomposition
+    inverse_covariance = local_inv_cov(point, coordinates, bandwidth)
+    # Compute the eigendecomposition of the local inverse covariance
+    eigen_values, eigen_vectors = np.linalg.eig(inverse_covariance)
+    # Align the eigenvectors with the sorted eigenvalues
+    sorted_eigen_values = np.argsort(eigen_values)
+    eigen_vectors = eigen_vectors[:, sorted_eigen_values]
+    # Cut the eigenvectors according to the sorted eigenvalues
+    cut_eigen_vectors = eigen_vectors[:, 1:]
+    # Project the update to the eigenvector-spanned orthogonal subspace
+    point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)    
+    # Return the projections as the point updates
+    return point_updates
+
 
 @njit
 def gaussian_kernel(values,  bandwidth):
