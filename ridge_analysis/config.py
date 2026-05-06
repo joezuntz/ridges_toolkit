@@ -53,7 +53,6 @@ class ShearConfig:
     output_shear_file: str
     source_catalog_file: str
     ridge_file: str
-    shear_file: str
     flip_g1: bool = False
     flip_g2: bool = False
     num_bins: int = 20

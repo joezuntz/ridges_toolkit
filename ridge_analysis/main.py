@@ -69,8 +69,7 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
 def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatalog:
     from .segmentation import build_mst, detect_branch_points, split_mst_at_branches, segment_filaments_with_dbscan
 
-    # If the catalog is already loaded this will do nothing, otherwise it will load the data from disk.
-    # Ridge segmentation is very fast, so we don't parallelize this step.
+    # Load the data from disk.
     ridge_point_catalog = RidgePointCatalog(segmentation_config.ridge_point_file)
     ridge_point_catalog.load()
 
@@ -96,13 +95,13 @@ def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatal
     return output
 
 
-def measure_ridge_shear(shear_config: ShearConfig):
+def measure_ridge_shear(shear_config: ShearConfig, comm=None):
 
     ridge_segments = RidgeSegmentCatalog(shear_config.ridge_file)
     ridge_segments.load()
 
     source_catalog = SourceCatalog(shear_config.source_catalog_file)
-    source_catalog.load()
+    source_catalog.load(comm=comm, split_over_ranks=True)
 
     shear_table = measure_shear(
         ridge_segments,
@@ -110,7 +109,7 @@ def measure_ridge_shear(shear_config: ShearConfig):
         shear_config.output_shear_file,
         k=1,
         num_bins=shear_config.num_bins,
-        comm=None,
+        comm=comm,
         flip_g1=shear_config.flip_g1,
         flip_g2=shear_config.flip_g2,
         nside_coverage=shear_config.nside_coverage,
@@ -120,5 +119,6 @@ def measure_ridge_shear(shear_config: ShearConfig):
         min_filament_points=shear_config.min_filament_points,
     )
 
-    shear_table.save()
+    if comm is None or comm.rank == 0:
+        shear_table.save()
     return shear_table

@@ -56,7 +56,8 @@ class Catalog:
         if comm is not None and split_over_ranks:
             rank = comm.rank
             size = comm.size
-            length = f[self.columns[0]].shape[0]
+            with h5py.File(self.filename, "r") as f:
+                length = f[self.columns[0]].shape[0]
             rows = length // size
             if rank == size - 1:
                 my_rows = length - rows * (size - 1)

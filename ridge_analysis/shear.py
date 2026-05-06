@@ -126,7 +126,7 @@ def measure_shear(
     coverage_pixel_size = hp.nside2resol(nside_coverage, arcmin=True)
     assert (
         coverage_pixel_size > max_distance_arcmin
-    ), "Coverage pixel size ({coverage_pixel_size} arcmin) must be larger than max_distance_arcmin ({max_distance_arcmin} arcmin). Increase nside_coverage."
+    ), "Coverage pixel size ({coverage_pixel_size} arcmin) must be larger than max_distance_arcmin ({max_distance_arcmin} arcmin). Decrease nside_coverage."
 
     start_time = time.time()
 
@@ -153,7 +153,7 @@ def measure_shear(
     rank = comm.rank if comm is not None else 0
 
     # from sklearn docs:
-    #  Note that the haversine distance metric requires data in the form of [latitude, longitude]
+    # Note that the haversine distance metric requires data in the form of [latitude, longitude]
     # and both inputs and outputs are in units of radians.
     # check units are in degrees
     assert ra_filaments.max() < 3 * np.pi, "Filament RA values should be in radians {}".format(ra_filaments.max())
@@ -169,6 +169,10 @@ def measure_shear(
         weights_background,
         nside_coverage,
     )
+
+
+    bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)  # This is now moved to the top
+
 
     unique_labels = np.unique(labels)
     unique_labels = unique_labels[unique_labels != -1]  # Exclude noise label (-1)
@@ -258,8 +262,8 @@ def measure_shear(
     for i in range(num_bins):
         output_table.data.add_row(
             (
-                bin_centers[i],
-                weighted_real_distances[i],
+                radians_to_arcmin(bin_centers[i]),
+                radians_to_arcmin(weighted_real_distances[i]),
                 weighted_g_plus[i],
                 weighted_g_cross[i],
                 bin_counts[i],
@@ -267,10 +271,12 @@ def measure_shear(
             )
         )
 
+    print(f"Shear processing completed in {time.time() - start_time:.2f} seconds.")
     return output_table
 
-    print(f"Shear processing completed in {time.time() - start_time:.2f} seconds.")
 
+def radians_to_arcmin(radians):
+    return np.degrees(radians) * 60.0
 
 def sum_in_place(data, comm):
     """
