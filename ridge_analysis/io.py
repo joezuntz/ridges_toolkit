@@ -13,6 +13,7 @@ class Catalog:
     """
 
     columns = []
+    optional_columns = []
 
     def __init__(self, filename):
         self.filename = filename
@@ -77,7 +78,10 @@ class Catalog:
         if (comm is None) or (comm.rank == 0) or split_over_ranks:
             with h5py.File(self.filename, "r") as f:
                 for col in self.columns:
-                    self.data[col] = f[col][slc]
+                    if col not in f and col not in self.optional_columns:
+                        raise ValueError(f"Column {col} not found in file {self.filename}")
+                    elif col in f:
+                        self.data[col] = f[col][slc]
 
         # In this case every process should get all the catalog
         if (comm is not None) and (not split_over_ranks):
@@ -100,11 +104,12 @@ class Catalog:
 
 class LensCatalog(Catalog):
     columns = ["ra", "dec", "z"]
+    optional_columns = ["z"]
 
 
 class SourceCatalog(Catalog):
     columns = ["ra", "dec", "z", "g1", "g2", "weight"]
-
+    optional_columns = ["z"]
 
 class RidgePointCatalog(Catalog):
     columns = ["ra", "dec", "density"]

@@ -218,8 +218,8 @@ def main(config_file, action):
     # decide which step to do based on the command-line argument
     if action == "simulate":
         simulate(config["global"], config["simulate"])
-    elif action == "ridges":
-        locate_ridges(config["global"], config["ridges"])
+    elif action == "dredge":
+        locate_ridges(config["global"], config["dredge"])
     elif action == "segment":
         segment_ridges(config["global"], config["segment"])
     elif action == "plot":
