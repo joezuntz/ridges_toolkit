@@ -66,6 +66,7 @@ class Catalog:
 
             start = rank * rows
             slc = slice(start, start + my_rows)
+            print("Rank", rank, "loading rows", start, "to", start + my_rows)
         else:
             slc = slice(None)
 

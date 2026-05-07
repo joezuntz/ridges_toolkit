@@ -130,11 +130,16 @@ def measure_shear(
 
     start_time = time.time()
 
-    ra_filaments = np.radians(ridge_catalog.ra)
+    # Ensure RA values are between 0 and 2pi.
+    # Every process loads the filament catalog in full.
+    ra_filaments = np.radians(ridge_catalog.ra) % (2 * np.pi)
     dec_filaments = np.radians(ridge_catalog.dec)
     labels = ridge_catalog.ridge_id
 
-    ra_background = np.radians(source_catalog.ra)
+    # The source catalog is split among the different processes.
+    # The should have been done already when loading in the first place,
+    # in the calling function.
+    ra_background = np.radians(source_catalog.ra) % (2 * np.pi)
     dec_background = np.radians(source_catalog.dec)
     g1_background = source_catalog.g1
     g2_background = source_catalog.g2
@@ -170,8 +175,9 @@ def measure_shear(
         nside_coverage,
     )
 
-
-    bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)  # This is now moved to the top
+    # Angular bins for the shear measurement in radians.
+    # We use a similar configuration to galaxy-galaxy lensing.
+    bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)
 
 
     unique_labels = np.unique(labels)
@@ -217,15 +223,12 @@ def measure_shear(
         g_cross = g1_subset * np.sin(2 * phi) - g2_subset * np.cos(2 * phi)
 
         # Bin the distances between 1 arcmin and 1 degree
-        bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)  # This is now moved to the top
         bin_indices = np.digitize(distances[:, 0], bins) - 1
         valid_bins = (bin_indices >= 0) & (bin_indices < num_bins)
 
         if skip_end_points:
             # optionally skip pairs where the filament point is at the end of the filament
             raise RuntimeError("skip_end_points=True is broken - not ordered")
-            mask = (indices[:, 0] > 0) & (indices[:, 0] < len(filament_coords) - 1)
-            valid_bins = valid_bins & mask
 
         # Accumulate the total tangential and cross shear in each bin,
         # together with the counts, weights, and actual (as opposed to nominal) distances.
