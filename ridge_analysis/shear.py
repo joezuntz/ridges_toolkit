@@ -6,20 +6,53 @@ from sklearn.neighbors import NearestNeighbors
 from .io import ShearMeasurement
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+import numba
 
 
+@numba.njit
 def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
     """
     All inputs are expected to be in radians
     """
-    # matched_filament_points and bg_coords are in radians right now.
-    # So we need to convert them back to degrees for SkyCoord
-    bg_sky = SkyCoord(ra=ra_source * u.rad, dec=dec_source * u.rad)
-    filament_sky = SkyCoord(ra=ra_filament * u.rad, dec=dec_filament * u.rad)
+    deltalon = ra_filament - ra_source
+    colat = np.cos(dec_filament)
 
-    # Compute position angle of filament point relative to background galaxy
-    phi = bg_sky.position_angle(filament_sky).rad + np.pi / 2  # radians, same as before
-    return phi
+    x = np.sin(dec_filament) * np.cos(dec_source) - colat * np.sin(dec_source) * np.cos(deltalon)
+    y = np.sin(deltalon) * colat
+    return np.arctan2(y, x) % (2 * np.pi) + np.pi / 2 
+
+
+@numba.njit
+def haversine_distance(source_coords, filament_coords):
+    """
+    Compute the haversine distance between two points on the sphere.
+    All inputs are expected to be in radians.
+
+    Supports scalar inputs, same-shaped arrays, and pairwise distances for
+    different-length 1D arrays (returns an N1 x N2 matrix).
+    """
+    ra1 = source_coords[:, 1]
+    dec1 = source_coords[:, 0]
+    ra2 = filament_coords[:, 1]
+    dec2 = filament_coords[:, 0]
+
+    # ra1 = np.asarray(ra1)
+    # dec1 = np.asarray(dec1)
+    # ra2 = np.asarray(ra2)
+    # dec2 = np.asarray(dec2)
+
+    # If both are 1D and have different lengths, compute all pairwise distances.
+    # if ra1.ndim == dec1.ndim == ra2.ndim == dec2.ndim == 1 and ra1.size != ra2.size:
+    ra1 = ra1[:, None]
+    dec1 = dec1[:, None]
+    ra2 = ra2[None, :]
+    dec2 = dec2[None, :]
+
+    deltalon = ra2 - ra1
+    deltalat = dec2 - dec1
+    a = np.sin(deltalat / 2) ** 2 + np.cos(dec1) * np.cos(dec2) * np.sin(deltalon / 2) ** 2
+    a = np.clip(a, 0.0, 1.0)
+    return 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
 
 def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
@@ -50,13 +83,16 @@ def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
     # 110 arcmin, so as we are only going out to 1 degree that should be enough for any
     # adjacent pixels.
     source_healpix_low_res = hp.ang2pix(nside_coverage, np.pi / 2 - decs, ras)
-    n_unique_pixels = len(np.unique(source_healpix_low_res))
+    unique_pix = np.unique(source_healpix_low_res)
+    n_unique_pixels = len(unique_pix)
     print(f"Precomputing source pixel regions: {n_unique_pixels} unique pixels at nside {nside_coverage}")
     # 1715 pixels, so a nice reduction but not too small.
     pixel_regions = {}
 
-    # This takes < 1 minute
-    for j, i in enumerate(np.unique(source_healpix_low_res)):
+    # This takes < 1 minute.
+    # I tried speeding it up with numba and by making it a single
+    # pass through the data, but it was much slower.
+    for i in unique_pix:
         index = np.where(source_healpix_low_res == i)[0]
         pixel_regions[i] = (ras[index], decs[index], g1[index], g2[index], weights[index])
 
@@ -205,10 +241,15 @@ def measure_shear(
                 f"[{rank}] Processing filament {filament_index} / {len(unique_labels)} - {source_coords.shape[0]} nearby sources"
             )
 
-        # For each background galaxy, find nearest filament point
-        nbrs = NearestNeighbors(n_neighbors=1, leaf_size=100, metric="haversine").fit(filament_coords)
+        # I tried replacing this with brute-force comparison
+        # to each of the filaments, but it ended up a little slower,
+        # I think because the Haversince distance is relatively expensive,
+        # even with numba.
+        nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine").fit(filament_coords)
         distances, indices = nbrs.kneighbors(source_coords)
-        matched_filament_points = filament_coords[indices[:, 0]]
+        indices = indices[:, 0]
+        distances = distances[:, 0]
+        matched_filament_points = filament_coords[indices]
 
         # Get the rotation angle phi between the background galaxy and the filament point
         phi = get_position_angle(
@@ -223,7 +264,7 @@ def measure_shear(
         g_cross = g1_subset * np.sin(2 * phi) - g2_subset * np.cos(2 * phi)
 
         # Bin the distances between 1 arcmin and 1 degree
-        bin_indices = np.digitize(distances[:, 0], bins) - 1
+        bin_indices = np.digitize(distances, bins) - 1
         valid_bins = (bin_indices >= 0) & (bin_indices < num_bins)
 
         if skip_end_points:
@@ -235,7 +276,7 @@ def measure_shear(
         np.add.at(bin_sums_plus, bin_indices[valid_bins], weights_subset[valid_bins] * g_plus[valid_bins])
         np.add.at(bin_sums_cross, bin_indices[valid_bins], weights_subset[valid_bins] * g_cross[valid_bins])
         np.add.at(
-            bin_weighted_distances, bin_indices[valid_bins], weights_subset[valid_bins] * distances[valid_bins, 0]
+            bin_weighted_distances, bin_indices[valid_bins], weights_subset[valid_bins] * distances[valid_bins]
         )
         np.add.at(bin_weights, bin_indices[valid_bins], weights_subset[valid_bins])
         np.add.at(bin_counts, bin_indices[valid_bins], 1)
