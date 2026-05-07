@@ -99,16 +99,26 @@ def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
     return pixel_regions
 
 
-def get_nearby_sources(raf, decf, pixel_regions, nside_coverage):
+def get_nearby_sources(raf, decf, pixel_regions, nside_coverage, max_ang_rad):
     """
     Extract from the pixel regions the sources that are near to the filament points.
     """
-    filament_pix_low_res = hp.ang2pix(nside_coverage, np.pi / 2 - decf, raf)
-    filament_pix_low_res = np.unique(filament_pix_low_res)
-    pixels_needed = hp.get_all_neighbours(nside_coverage, filament_pix_low_res).flatten()
+    # we can improve this. 
+    # we just want the pixels that have any points within max_distance_arcmin of the filament points.
+    vecs = hp.ang2vec(np.pi / 2 - decf, raf)
+    filament_pix_low_res = []
+    for v in vecs:
+        ipix = hp.query_disc(nside_coverage, v, max_ang_rad, inclusive=True)
+        filament_pix_low_res.append(ipix)
+
+    pixels_needed = np.unique(np.concatenate(filament_pix_low_res))
+    # hp.query_disc
+    # filament_pix_low_res = hp.ang2pix(nside_coverage, np.pi / 2 - decf, raf)
+    # filament_pix_low_res = np.unique(filament_pix_low_res)
+    # pixels_needed = hp.get_all_neighbours(nside_coverage, filament_pix_low_res).flatten()
 
     # Include the filament pixels themselves, and then get unique values
-    pixels_needed = np.unique(np.concatenate((pixels_needed, filament_pix_low_res)))
+    # pixels_needed = np.unique(np.concatenate((pixels_needed, filament_pix_low_res)))
     ra = []
     dec = []
     g1 = []
@@ -229,7 +239,7 @@ def measure_shear(
 
         # Pull out sources within adjacent low-resolution healpix pixels
         source_coords, ra_subset, dec_subset, g1_subset, g2_subset, weights_subset = get_nearby_sources(
-            ra_filaments[filament_mask], dec_filaments[filament_mask], pixel_regions, nside_coverage
+            ra_filaments[filament_mask], dec_filaments[filament_mask], pixel_regions, nside_coverage, max_ang_rad
         )
 
         # There may be no sources near this filament segment
