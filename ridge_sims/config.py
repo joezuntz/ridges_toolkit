@@ -76,7 +76,7 @@ class Config:
 
     def save(self):
         os.makedirs(self.sim_dir, exist_ok=True)
-        filename = f"{self.sim_dir}/config.yaml"
+        filename = f"{self.sim_dir}/sim_config.yaml"
         with open(filename, "w") as f:
             yaml.dump(self, f)
 

@@ -1,0 +1,45 @@
+global:
+    catalog_dir: ./example
+    ridge_dir: ./example
+    segment_dir: ./example
+    plot_dir: ./example
+    shear_dir: ./example
+    lens_bins: [0]
+    source_bins: [0]
+
+# You can find complete listings of the parameters
+# available for each of these sections in the
+# config.py files in the ridge_sims and ridge_analysis directories.
+
+simulate:
+    dx: 300.0
+    lsst: false
+    nprocess: 8
+    include_shape_noise: false
+    seed: 7207654
+    nside: 1024
+    Omega_m: 0.3
+    Omega_b: 0.05
+    sigma8: 0.8
+    h: 0.7
+
+dredge:
+    seed: 888
+    num_ridge_points: 1000000
+    shift_180: true
+
+segment:
+    density_percentile: 0.0
+    mst_neighbours: 10
+
+plot:
+    nside: 1024
+    smoothing: 0.2
+
+shear:
+    flip_g1: false
+    flip_g2: false
+    num_bins: 20
+    min_distance_arcmin: 1.0
+    max_distance_arcmin: 60.0
+    nside_coverage: 32
