@@ -146,10 +146,11 @@ def plot(global_config, plot_config):
 
     import mpi4py.MPI as MPI
     comm = MPI.COMM_WORLD
-    if comm.rank != 0:
-        return
 
-    for b in bins:
+    for i, b in enumerate(bins):
+        if i % comm.size != comm.rank:
+            continue
+
         dredge_config = ridge_analysis.DredgeConfig(
             lens_catalog_file=f"{catalog_dir}/lens_catalog_{b}.hdf5",
             ridge_point_file=f"{ridge_dir}/ridge_points_{b}.hdf5",
