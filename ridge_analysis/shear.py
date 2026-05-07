@@ -225,6 +225,7 @@ def measure_shear(
     # We use a similar configuration to galaxy-galaxy lensing.
     bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)
 
+    start_time = time.time()
 
     unique_labels = np.unique(labels)
     unique_labels = unique_labels[unique_labels != -1]  # Exclude noise label (-1)
@@ -255,7 +256,7 @@ def measure_shear(
         # to each of the filaments, but it ended up a little slower,
         # I think because the Haversince distance is relatively expensive,
         # even with numba.
-        nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine").fit(filament_coords)
+        nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine", algorithm="brute").fit(filament_coords)
         distances, indices = nbrs.kneighbors(source_coords)
         indices = indices[:, 0]
         distances = distances[:, 0]
