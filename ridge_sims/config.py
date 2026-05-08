@@ -17,6 +17,25 @@ class Config:
     This object stores our configuration for the simulation.
     """
 
+    help = {
+        "sim_dir": "Directory to store simulation outputs",
+        "lens_type": "Type of lens sample (maglim or redmagic)",
+        "lmax": "Maximum multipole for power spectra",
+        "combined": "Whether to generate a single combined sample or tomographic bins",
+        "zmax": "Maximum redshift for samples",
+        "dx": "Size of shells in simulation in Mpc/h",
+        "nside": "Healpix nside for maps",
+        "nprocess": "Number of processes to use for parallel steps",
+        "h": "Hubble parameter / 100 km/s/Mpc",
+        "Omega_m": "Matter density parameter",
+        "Omega_b": "Baryon density parameter",
+        "sigma8": "Amplitude of matter fluctuations",
+        "seed": "Random seed for reproducibility",
+        "include_shape_noise": "Whether to include shape noise in the source catalog",
+        "lsst": "Whether to use LSST-like source galaxy distribution",
+        "lsst10_nz": "Whether to use LSST year-10 like source galaxy distribution (only relevant if lsst=True)",
+    }
+
     def __init__(
         self,
         sim_dir="sim-fiducial",

@@ -33,6 +33,20 @@ class DredgeConfig:
     # Whether to shift longitudes to avoid 0/360 degree boundary issues
     shift_180: bool = False
 
+    help = {
+        "lens_catalog_file": "Path to the lens catalog file (HDF5 format).",
+        "ridge_point_file": "Path to the output ridge point file (HDF5 format).",
+        "checkpoint_dir": "Directory to save intermediate results and checkpoints.",
+        "bandwidth": "Bandwidth for density estimation in arcminutes.",
+        "num_ridge_points": "Number of ridge points to generate.",
+        "neighbours": "Number of nearest neighbors to consider for density estimation.",
+        "convergence": "Convergence threshold for ridge point identification in arcminutes.",
+        "seed": "Random seed for reproducibility.",
+        "lens_zmin": "Minimum redshift of lenses to consider.",
+        "lens_zmax": "Maximum redshift of lenses to consider.",
+        "shift_180": "Whether to shift longitudes by 180 degrees and back at the end to avoid boundary issues."
+    }
+
     def bandwidth_radians(self):
         return np.radians(self.bandwidth / 60.0)
 
@@ -46,6 +60,13 @@ class SegmentationConfig:
     ridge_file: str
     density_percentile: float = 0.0
     mst_neighbours: int = 10
+
+    help = {
+        "ridge_point_file": "Path to the input ridge point file (HDF5 format).",
+        "ridge_file": "Path to the output ridge file (HDF5 format).",
+        "density_percentile": "Percentile threshold for density to filter ridge points (0-100).",
+        "mst_neighbours": "Number of nearest neighbors to consider when building the minimum spanning tree for segmentation."
+    }   
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -63,3 +84,19 @@ class ShearConfig:
     skip_end_points: bool = False
     source_zmin: float = 0.0
     source_zmax: float = 100.0
+
+    help = {
+        "output_shear_file": "Path to the output shear file (text format)",
+        "source_catalog_file": "Path to the source catalog file (HDF5 format).",
+        "ridge_file": "Path to the input ridge file (HDF5 format).",
+        "flip_g1": "Whether to flip the sign of the g1 shear component.",
+        "flip_g2": "Whether to flip the sign of the g2 shear component.",
+        "num_bins": "Number of logarithmic bins for shear measurement.",
+        "min_distance_arcmin": "Minimum distance from ridge points to consider for shear measurement in arcminutes.",
+        "max_distance_arcmin": "Maximum distance from ridge points to consider for shear measurement in arcminutes.",
+        "nside_coverage": "Healpix nside for determining ridge point coverage.",
+        "min_filament_points": "Minimum number of points in a filament to be included in the shear measurement.",
+        "skip_end_points": "Whether to skip the end points of filaments in the shear measurement (not functional).",
+        "source_zmin": "Minimum redshift of source galaxies to consider (not functional).",
+        "source_zmax": "Maximum redshift of source galaxies to consider (not functional).",
+    }
