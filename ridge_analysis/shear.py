@@ -19,7 +19,7 @@ def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
 
     x = np.sin(dec_filament) * np.cos(dec_source) - colat * np.sin(dec_source) * np.cos(deltalon)
     y = np.sin(deltalon) * colat
-    return np.arctan2(y, x) % (2 * np.pi) + np.pi / 2 
+    return np.arctan2(y, x) % (2 * np.pi) + np.pi / 2
 
 
 @numba.njit
@@ -90,7 +90,7 @@ def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
     pixel_regions = {}
 
     # This takes < 1 minute.
-    # I tried speeding it up with numba and by making it a single
+    # I tried speeding it up with numba and by making it a single
     # pass through the data, but it was much slower.
     for i in unique_pix:
         index = np.where(source_healpix_low_res == i)[0]
@@ -103,8 +103,8 @@ def get_nearby_sources(raf, decf, pixel_regions, nside_coverage, max_ang_rad):
     """
     Extract from the pixel regions the sources that are near to the filament points.
     """
-    # we can improve this. 
-    # we just want the pixels that have any points within max_distance_arcmin of the filament points.
+    # we can improve this.
+    # we just want the pixels that have any points within max_distance_arcmin of the filament points.
     vecs = hp.ang2vec(np.pi / 2 - decf, raf)
     filament_pix_low_res = []
     for v in vecs:
@@ -151,22 +151,22 @@ def measure_shear(
     ridge_catalog: RidgeSegmentCatalog,
     source_catalog: SourceCatalog,
     output_shear_file: str,
-    num_bins: int=20,
+    num_bins: int = 20,
     comm=None,
-    flip_g1: bool=False,
-    flip_g2: bool=False,
-    nside_coverage: int=32,
-    min_distance_arcmin: float=1.0,
-    max_distance_arcmin: float=60.0,
-    skip_end_points: bool=False,
-    min_filament_points: int=0,
-    neighbour_algorithm: str="brute",
+    flip_g1: bool = False,
+    flip_g2: bool = False,
+    nside_coverage: int = 32,
+    min_distance_arcmin: float = 1.0,
+    max_distance_arcmin: float = 60.0,
+    skip_end_points: bool = False,
+    min_filament_points: int = 0,
+    neighbour_algorithm: str = "brute",
 ):
     """
     Measure the tangential shear in the source catalog around the ridges in the ridge catalog.
 
-    The result is saved to output_shear_file, which is an ASCII file with columns for the separation 
-    bin centers, the weighted average separation, the tangential shear, the cross shear, the counts, 
+    The result is saved to output_shear_file, which is an ASCII file with columns for the separation
+    bin centers, the weighted average separation, the tangential shear, the cross shear, the counts,
     and the weights in each bin.
 
     The separations are saved in arcminutes.
@@ -191,7 +191,7 @@ def measure_shear(
         Whether to flip the sign of g2 when computing the tangential shear. Default is False.
     nside_coverage : int
         The nside of the low-resolution healpix map to use for precomputing source regions. Default is 32.
-        Higher values will slow the precomputation but may speed up the source lookup later on. 
+        Higher values will slow the precomputation but may speed up the source lookup later on.
     min_distance_arcmin : float
         The minimum distance from the filament to include in the shear measurement, in arcminutes. Default is 1.0 arcmin.
     max_distance_arcmin : float
@@ -205,8 +205,10 @@ def measure_shear(
         The algorithm to use for finding nearest neighbors when determining the nearest filament point to each source.
         Must be one of 'auto', 'ball_tree', 'kd_tree', or 'brute'. Default is 'brute'.
     """
-    if neighbour_algorithm not in ['auto', 'ball_tree', 'kd_tree', 'brute']:
-        raise ValueError(f"Invalid neighbour_algorithm: {neighbour_algorithm}. Must be one of 'auto', 'ball_tree', 'kd_tree', 'brute'.")
+    if neighbour_algorithm not in ["auto", "ball_tree", "kd_tree", "brute"]:
+        raise ValueError(
+            f"Invalid neighbour_algorithm: {neighbour_algorithm}. Must be one of 'auto', 'ball_tree', 'kd_tree', 'brute'."
+        )
 
     min_ang_rad = np.radians(min_distance_arcmin / 60)
     max_ang_rad = np.radians(max_distance_arcmin / 60)
@@ -224,9 +226,9 @@ def measure_shear(
     dec_filaments = np.radians(ridge_catalog.dec)
     labels = ridge_catalog.ridge_id
 
-    # The source catalog is split among the different processes.
+    # The source catalog is split among the different processes.
     # The should have been done already when loading in the first place,
-    # in the calling function.
+    # in the calling function.
     ra_background = np.radians(source_catalog.ra) % (2 * np.pi)
     dec_background = np.radians(source_catalog.dec)
     g1_background = source_catalog.g1
@@ -264,7 +266,7 @@ def measure_shear(
     )
 
     # Angular bins for the shear measurement in radians.
-    # We use a similar configuration to galaxy-galaxy lensing.
+    # We use a similar configuration to galaxy-galaxy lensing.
     bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)
 
     start_time = time.time()
@@ -294,8 +296,8 @@ def measure_shear(
                 f"[{rank}] Processing filament {filament_index} / {len(unique_labels)} - {source_coords.shape[0]} nearby sources"
             )
 
-        # The brute force algorithm here is faster for the tests I've been doing than a 
-        # tree, because the number of filament points is not that high. That might change with
+        # The brute force algorithm here is faster for the tests I've been doing than a
+        # tree, because the number of filament points is not that high. That might change with
         # different ridge choices.
         nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine", algorithm="brute").fit(filament_coords)
         distances, indices = nbrs.kneighbors(source_coords)
@@ -327,9 +329,7 @@ def measure_shear(
         # together with the counts, weights, and actual (as opposed to nominal) distances.
         np.add.at(bin_sums_plus, bin_indices[valid_bins], weights_subset[valid_bins] * g_plus[valid_bins])
         np.add.at(bin_sums_cross, bin_indices[valid_bins], weights_subset[valid_bins] * g_cross[valid_bins])
-        np.add.at(
-            bin_weighted_distances, bin_indices[valid_bins], weights_subset[valid_bins] * distances[valid_bins]
-        )
+        np.add.at(bin_weighted_distances, bin_indices[valid_bins], weights_subset[valid_bins] * distances[valid_bins])
         np.add.at(bin_weights, bin_indices[valid_bins], weights_subset[valid_bins])
         np.add.at(bin_counts, bin_indices[valid_bins], 1)
 
@@ -373,6 +373,7 @@ def measure_shear(
 
 def radians_to_arcmin(radians):
     return np.degrees(radians) * 60.0
+
 
 def sum_in_place(data, comm):
     """

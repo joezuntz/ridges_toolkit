@@ -111,6 +111,7 @@ class SourceCatalog(Catalog):
     columns = ["ra", "dec", "z", "g1", "g2", "weight"]
     optional_columns = ["z"]
 
+
 class RidgePointCatalog(Catalog):
     columns = ["ra", "dec", "density"]
 
