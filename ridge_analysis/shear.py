@@ -3,7 +3,7 @@ import h5py
 import time
 import healpy as hp
 from sklearn.neighbors import NearestNeighbors
-from .io import ShearMeasurement
+from .io import ShearMeasurement, RidgeSegmentCatalog, SourceCatalog
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import numba
@@ -148,26 +148,68 @@ def get_nearby_sources(raf, decf, pixel_regions, nside_coverage, max_ang_rad):
 
 
 def measure_shear(
-    ridge_catalog,
-    source_catalog,
-    output_shear_file,
-    k=1,
-    num_bins=20,
+    ridge_catalog: RidgeSegmentCatalog,
+    source_catalog: SourceCatalog,
+    output_shear_file: str,
+    num_bins: int=20,
     comm=None,
-    flip_g1=False,
-    flip_g2=False,
-    nside_coverage=32,
-    min_distance_arcmin=1.0,
-    max_distance_arcmin=60.0,
-    skip_end_points=False,
-    min_filament_points=0,
+    flip_g1: bool=False,
+    flip_g2: bool=False,
+    nside_coverage: int=32,
+    min_distance_arcmin: float=1.0,
+    max_distance_arcmin: float=60.0,
+    skip_end_points: bool=False,
+    min_filament_points: int=0,
+    neighbour_algorithm: str="brute",
 ):
+    """
+    Measure the tangential shear in the source catalog around the ridges in the ridge catalog.
+
+    The result is saved to output_shear_file, which is an ASCII file with columns for the separation 
+    bin centers, the weighted average separation, the tangential shear, the cross shear, the counts, 
+    and the weights in each bin.
+
+    The separations are saved in arcminutes.
+
+    Parameters
+    ----------
+    ridge_catalog : RidgePointCatalog
+        The catalog of ridge points to measure around.
+    source_catalog : SourceCatalog
+        The catalog of source galaxies to measure the shear of.
+    output_shear_file : str
+        The name of the file to write the shear measurement results to.
+    k : int
+        The number of nearest neighbors to use when determining the distance from sources to filaments. Default is 1 (i.e. use the nearest filament point).
+    num_bins : int
+        The number of bins to use in the shear measurement. Default is 20.
+    comm : mpi4py.MPI.Comm
+        The MPI communicator to use for parallel processing. If None, no parallel processing is used.
+    flip_g1 : bool
+        Whether to flip the sign of g1 when computing the tangential shear. Default is False.
+    flip_g2 : bool
+        Whether to flip the sign of g2 when computing the tangential shear. Default is False.
+    nside_coverage : int
+        The nside of the low-resolution healpix map to use for precomputing source regions. Default is 32.
+        Higher values will slow the precomputation but may speed up the source lookup later on. 
+    min_distance_arcmin : float
+        The minimum distance from the filament to include in the shear measurement, in arcminutes. Default is 1.0 arcmin.
+    max_distance_arcmin : float
+        The maximum distance from the filament to include in the shear measurement, in arcminutes. Default is 60.0 arcmin (i.e. 1 degree).
+    skip_end_points : bool
+        Whether to skip pairs where the filament point is at the end of the filament. Default is False.
+        Does not work currently because the filament points are not ordered, so should be used with skip_end_points=False for now.
+    min_filament_points : int
+        The minimum number of points in a filament segment to include in the shear measurement. Default is 0 (i.e. include all filaments).
+    neighbour_algorithm : str
+        The algorithm to use for finding nearest neighbors when determining the nearest filament point to each source.
+        Must be one of 'auto', 'ball_tree', 'kd_tree', or 'brute'. Default is 'brute'.
+    """
+    if neighbour_algorithm not in ['auto', 'ball_tree', 'kd_tree', 'brute']:
+        raise ValueError(f"Invalid neighbour_algorithm: {neighbour_algorithm}. Must be one of 'auto', 'ball_tree', 'kd_tree', 'brute'.")
 
     min_ang_rad = np.radians(min_distance_arcmin / 60)
     max_ang_rad = np.radians(max_distance_arcmin / 60)
-
-    # this line was defined lower in the code
-    # bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)
 
     coverage_pixel_size = hp.nside2resol(nside_coverage, arcmin=True)
     assert (
@@ -252,10 +294,9 @@ def measure_shear(
                 f"[{rank}] Processing filament {filament_index} / {len(unique_labels)} - {source_coords.shape[0]} nearby sources"
             )
 
-        # I tried replacing this with brute-force comparison
-        # to each of the filaments, but it ended up a little slower,
-        # I think because the Haversince distance is relatively expensive,
-        # even with numba.
+        # The brute force algorithm here is faster for the tests I've been doing than a 
+        # tree, because the number of filament points is not that high. That might change with
+        # different ridge choices.
         nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine", algorithm="brute").fit(filament_coords)
         distances, indices = nbrs.kneighbors(source_coords)
         indices = indices[:, 0]

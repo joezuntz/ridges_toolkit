@@ -96,6 +96,19 @@ def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatal
 
 
 def measure_ridge_shear(shear_config: ShearConfig, comm=None):
+    """
+    Measure the shear around ridge segments and save the results to disk.
+
+    This loads the two catalogs and then calls the measure_shear function
+    with the configuration specified in shear_config. The measure_shear function does the
+    actual work.
+
+    Parameters
+    ----------
+    shear_config : ShearConfig
+        Configuration for the shear measurement, including file paths and measurement parameters.
+
+    """
 
     ridge_segments = RidgeSegmentCatalog(shear_config.ridge_file)
     ridge_segments.load()
@@ -107,7 +120,6 @@ def measure_ridge_shear(shear_config: ShearConfig, comm=None):
         ridge_segments,
         source_catalog,
         shear_config.output_shear_file,
-        k=1,
         num_bins=shear_config.num_bins,
         comm=comm,
         flip_g1=shear_config.flip_g1,
