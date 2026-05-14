@@ -222,9 +222,9 @@ def measure_shear(
 
     # Ensure RA values are between 0 and 2pi.
     # Every process loads the filament catalog in full.
-    ra_filaments = np.radians(ridge_catalog.ra) % (2 * np.pi)
-    dec_filaments = np.radians(ridge_catalog.dec)
-    labels = ridge_catalog.ridge_id
+    # ra_filaments = np.radians(ridge_catalog.ra) % (2 * np.pi)
+    # dec_filaments = np.radians(ridge_catalog.dec)
+    # labels = ridge_catalog.ridge_id
 
     # The source catalog is split among the different processes.
     # The should have been done already when loading in the first place,
@@ -251,8 +251,8 @@ def measure_shear(
     # Note that the haversine distance metric requires data in the form of [latitude, longitude]
     # and both inputs and outputs are in units of radians.
     # check units are in degrees
-    assert ra_filaments.max() < 3 * np.pi, "Filament RA values should be in radians {}".format(ra_filaments.max())
-    assert ra_background.max() < 3 * np.pi, "Background RA values should be in radians {}".format(ra_background.max())
+    # assert ra_filaments.max() < 3 * np.pi, "Filament RA values should be in radians {}".format(ra_filaments.max())
+    # assert ra_background.max() < 3 * np.pi, "Background RA values should be in radians {}".format(ra_background.max())
 
     # Pre-split the catalog into a low-resolution map, so that we can just look up pixels
     # that are relatively close to the filament points later.
@@ -270,21 +270,18 @@ def measure_shear(
     bins = np.logspace(np.log10(min_ang_rad), np.log10(max_ang_rad), num_bins + 1)
 
     start_time = time.time()
+    n_filaments = ridge_catalog.metadata["n_filaments"]
 
-    unique_labels = np.unique(labels)
-    unique_labels = unique_labels[unique_labels != -1]  # Exclude noise label (-1)
+    for (filament_index, filament_ra, filament_dec) in ridge_catalog.iterate_ridges(radians=True):
+        filament_coords = np.array([filament_dec, filament_ra]).T
 
-    for filament_index, label in enumerate(unique_labels):
-        filament_mask = np.where(labels == label)[0]
-        filament_coords = np.array([dec_filaments[filament_mask], ra_filaments[filament_mask]]).T
-
-        if filament_mask.size < min_filament_points:
-            print(f"[{rank}] Skipping filament {filament_index} (label {label}) with only {filament_mask.size} points")
+        if filament_dec.size < min_filament_points:
+            print(f"[{rank}] Skipping filament {filament_index} (label {filament_index}) with only {filament_dec.size} points")
             continue
 
         # Pull out sources within adjacent low-resolution healpix pixels
         source_coords, ra_subset, dec_subset, g1_subset, g2_subset, weights_subset = get_nearby_sources(
-            ra_filaments[filament_mask], dec_filaments[filament_mask], pixel_regions, nside_coverage, max_ang_rad
+            filament_ra, filament_dec, pixel_regions, nside_coverage, max_ang_rad
         )
 
         # There may be no sources near this filament segment
@@ -293,7 +290,7 @@ def measure_shear(
 
         if (rank == 0) and (filament_index % 10 == 0):
             print(
-                f"[{rank}] Processing filament {filament_index} / {len(unique_labels)} - {source_coords.shape[0]} nearby sources"
+                f"[{rank}] Processing filament {filament_index} / {n_filaments} - {source_coords.shape[0]} nearby sources"
             )
 
         # The brute force algorithm here is faster for the tests I've been doing than a

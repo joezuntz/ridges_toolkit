@@ -81,16 +81,36 @@ def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatal
     print("TODO EDGE FILTER!")
 
     ridges = ridge_point_catalog.dec_ra_in_radians()
-
+    print("Building MST")
     mst = build_mst(ridges, k=segmentation_config.mst_neighbours)
+    print("Splitting MST into segments")
     branch_points = detect_branch_points(mst)
     filament_segments = split_mst_at_branches(mst, branch_points)
+    # filament_segments is a list of graphs.
+    print("Clustering segments with DBSCAN")
     filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
-
+    #filament labels is now a list of indices.
     output = RidgeSegmentCatalog(segmentation_config.ridge_file)
-    output.set_column("ra", np.degrees(ridges[:, 1]))
-    output.set_column("dec", np.degrees(ridges[:, 0]))
-    output.set_column("ridge_id", filament_labels)
+
+    final_nridge = sum(len(seg) for seg in filament_labels)
+    ra_out = np.zeros(final_nridge)
+    dec_out = np.zeros(final_nridge)
+    ridge_id_out = np.zeros(final_nridge, dtype=int)
+    i = 0
+    for label, index in enumerate(filament_labels):
+        ra_chunk = np.degrees(ridges[index, 1])
+        dec_chunk = np.degrees(ridges[index, 0])
+        chunk_n = len(index)
+        ra_out[i : i + chunk_n] = ra_chunk
+        dec_out[i : i + chunk_n] = dec_chunk
+        ridge_id_out[i : i + chunk_n] = label
+        i += chunk_n
+
+    output.metadata["n_filaments"] = len(filament_labels)
+
+    output.set_column("ra", ra_out)
+    output.set_column("dec", dec_out)
+    output.set_column("ridge_id", ridge_id_out)
     output.save()
     return output
 

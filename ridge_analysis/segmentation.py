@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from collections import defaultdict
 from sklearn.cluster import DBSCAN
 from scipy.spatial import KDTree
 
@@ -35,26 +36,49 @@ def detect_branch_points(mst):
 
 
 def split_mst_at_branches(mst, branch_points):
-    """Splits the MST into connected components after removing branch points."""
+    """Splits the MST into ordered paths after removing branch points.
+
+    Since branch points are removed, each remaining connected component is a
+    simple path (max degree 2).  The nodes in each component are returned in
+    traversal order starting from one of the path endpoints.
+    """
     G = mst.copy()
     G.remove_nodes_from(branch_points)
-    return list(nx.connected_components(G))
+
+    ordered_segments = []
+    for component in nx.connected_components(G):
+        subgraph = G.subgraph(component)
+        # Endpoints have degree <= 1; start traversal from one of them so the
+        # result is a properly ordered path rather than an arbitrary DFS tree.
+        endpoints = [n for n in subgraph.nodes() if subgraph.degree(n) <= 1]
+        start = endpoints[0] if endpoints else next(iter(component))
+        path = list(nx.dfs_preorder_nodes(subgraph, source=start))
+        ordered_segments.append(path)
+
+    return ordered_segments
 
 
 def segment_filaments_with_dbscan(points, filament_segments, eps=0.02, min_samples=5):
-    """Clusters MST segments using DBSCAN."""
-    labels = np.full(len(points), -1)
-    cluster_id = 0
+    """Clusters MST segments using DBSCAN, returning ordered index arrays.
+
+    Each entry in the returned list is an ordered NumPy array of point indices
+    belonging to one filament, in the path order established by the MST.
+    DBSCAN is used only for noise removal; noise points (label -1) are dropped.
+    If a segment contains multiple DBSCAN clusters they are each returned as
+    a separate ordered array.
+    """
+    filaments = []
 
     for segment in filament_segments:
         segment_points = np.array([points[idx] for idx in segment])
         dbscan = DBSCAN(eps=eps, min_samples=min_samples)
         segment_labels = dbscan.fit_predict(segment_points)
 
-        for i, idx in enumerate(segment):
-            if segment_labels[i] != -1:
-                labels[idx] = cluster_id + segment_labels[i]
+        # Collect indices per cluster label, preserving MST traversal order.
+        clusters = defaultdict(list)
+        for idx, lbl in zip(segment, segment_labels):
+            if lbl != -1:
+                clusters[lbl].append(idx)
+        filaments.extend(np.asarray(cluster, dtype=np.int32) for cluster in clusters.values())
 
-        cluster_id += max(segment_labels) + 1 if len(segment_labels) > 0 else 0
-
-    return labels
+    return filaments

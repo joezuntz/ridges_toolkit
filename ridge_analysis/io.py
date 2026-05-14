@@ -103,8 +103,8 @@ class Catalog:
 
 
 class LensCatalog(Catalog):
-    columns = ["ra", "dec", "z"]
-    optional_columns = ["z"]
+    columns = ["ra", "dec", "z", "weight"]
+    optional_columns = ["z", "weight"]
 
 
 class SourceCatalog(Catalog):
@@ -126,6 +126,22 @@ class RidgePointCatalog(Catalog):
 
 class RidgeSegmentCatalog(Catalog):
     columns = ["ra", "dec", "ridge_id"]
+
+    def iterate_ridges(self, radians=False):
+        self.load()
+        change_points = np.where(np.diff(self.ridge_id) != 0)[0] + 1
+        boundaries = np.concatenate(([0], change_points, [len(self.ridge_id)]))
+        for i in range(len(boundaries) - 1):
+            start = boundaries[i]
+            end = boundaries[i + 1]
+            label = self.ridge_id[start]
+            ra_chunk = self.ra[start:end]
+            dec_chunk = self.dec[start:end]
+            if radians:
+                ra_chunk = np.radians(ra_chunk) % (2 * np.pi)
+                dec_chunk = np.radians(dec_chunk)
+            yield label, ra_chunk, dec_chunk
+
 
 
 class ShearMeasurement:
