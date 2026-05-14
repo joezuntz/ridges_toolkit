@@ -198,7 +198,6 @@ def measure_shear(
         The maximum distance from the filament to include in the shear measurement, in arcminutes. Default is 60.0 arcmin (i.e. 1 degree).
     skip_end_points : bool
         Whether to skip pairs where the filament point is at the end of the filament. Default is False.
-        Does not work currently because the filament points are not ordered, so should be used with skip_end_points=False for now.
     min_filament_points : int
         The minimum number of points in a filament segment to include in the shear measurement. Default is 0 (i.e. include all filaments).
     neighbour_algorithm : str
@@ -320,7 +319,7 @@ def measure_shear(
 
         if skip_end_points:
             # optionally skip pairs where the filament point is at the end of the filament
-            raise RuntimeError("skip_end_points=True is broken - not ordered")
+            valid_bins &= (indices > 0) & (indices < filament_coords.shape[0] - 1)
 
         # Accumulate the total tangential and cross shear in each bin,
         # together with the counts, weights, and actual (as opposed to nominal) distances.
