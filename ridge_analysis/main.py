@@ -66,53 +66,83 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
     return output
 
 
-def segment_ridges(segmentation_config: SegmentationConfig) -> RidgeSegmentCatalog:
-    from .segmentation import build_mst, detect_branch_points, split_mst_at_branches, segment_filaments_with_dbscan
+def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmentCatalog:
+    from .segmentation import build_mst, detect_branch_points, split_mst_at_branches, segment_filaments_with_dbscan, interpolate_segments
 
-    # Load the data from disk.
-    ridge_point_catalog = RidgePointCatalog(segmentation_config.ridge_point_file)
-    ridge_point_catalog.load()
+    rank = comm.rank if comm is not None else 0
+    size = comm.size if comm is not None else 1
+    if rank == 0:
+        # Load the data from disk.
+        ridge_point_catalog = RidgePointCatalog(segmentation_config.ridge_point_file)
+        ridge_point_catalog.load()
 
-    # Apply density cut if specified
-    if segmentation_config.density_percentile > 0.0:
-        ridge_point_catalog.apply_density_cut(segmentation_config.density_percentile)
+        # Apply density cut if specified
+        if segmentation_config.density_percentile > 0.0:
+            ridge_point_catalog.apply_density_cut(segmentation_config.density_percentile)
 
-    # Apply edge filter to remove points near survey boundaries
-    print("TODO EDGE FILTER!")
+        # Apply edge filter to remove points near survey boundaries
+        print("TODO EDGE FILTER!")
 
-    ridges = ridge_point_catalog.dec_ra_in_radians()
-    print("Building MST")
-    mst = build_mst(ridges, k=segmentation_config.mst_neighbours)
-    print("Splitting MST into segments")
-    branch_points = detect_branch_points(mst)
-    filament_segments = split_mst_at_branches(mst, branch_points)
-    # filament_segments is a list of graphs.
-    print("Clustering segments with DBSCAN")
-    filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
-    #filament labels is now a list of indices.
+        ridges = ridge_point_catalog.dec_ra_in_radians()
+
+        # The initial segmentation is very quick so we only do it on
+        # rank 0 and then broadcast the results to the other ranks for
+        # the optional spline interpolation step.
+        print("Building MST")
+        mst = build_mst(ridges, k=segmentation_config.mst_neighbours)
+        print("Splitting MST into segments")
+        branch_points = detect_branch_points(mst)
+        filament_segments = split_mst_at_branches(mst, branch_points)
+        # filament_segments is a list of graphs.
+        print("Clustering segments with DBSCAN")
+        filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
+        #filament labels is now a list of indices.
+
+        final_nridge = sum(len(seg) for seg in filament_labels)
+        ra_out = np.zeros(final_nridge)
+        dec_out = np.zeros(final_nridge)
+        ridge_id_out = np.zeros(final_nridge, dtype=int)
+        i = 0
+        for label, index in enumerate(filament_labels):
+            ra_chunk = np.degrees(ridges[index, 1])
+            dec_chunk = np.degrees(ridges[index, 0])
+            chunk_n = len(index)
+            ra_out[i : i + chunk_n] = ra_chunk
+            dec_out[i : i + chunk_n] = dec_chunk
+            ridge_id_out[i : i + chunk_n] = label
+            i += chunk_n
+
+    if size > 1 and segmentation_config.do_spline:
+        # Broadcast the results to all ranks for the optional spline interpolation step.
+        if rank == 0:
+            print(f"Broadcasting {len(ra_out)} ridge points to {size} ranks for interpolation")
+            n_filament =  len(filament_labels)
+        else:
+            print("Waiting to receive ridge points for interpolation")
+        ra_out = comm.bcast(ra_out if rank == 0 else None, root=0)
+        dec_out = comm.bcast(dec_out if rank == 0 else None, root=0)
+        ridge_id_out = comm.bcast(ridge_id_out if rank == 0 else None, root=0)
+        n_filament = comm.bcast(n_filament if rank == 0 else None, root=0)
+    else:
+        n_filament =  len(filament_labels)
+
+
+    # Now create the catalog object that is going into interpolation
+    # or to be saved otherwise.
     output = RidgeSegmentCatalog(segmentation_config.ridge_file)
-
-    final_nridge = sum(len(seg) for seg in filament_labels)
-    ra_out = np.zeros(final_nridge)
-    dec_out = np.zeros(final_nridge)
-    ridge_id_out = np.zeros(final_nridge, dtype=int)
-    i = 0
-    for label, index in enumerate(filament_labels):
-        ra_chunk = np.degrees(ridges[index, 1])
-        dec_chunk = np.degrees(ridges[index, 0])
-        chunk_n = len(index)
-        ra_out[i : i + chunk_n] = ra_chunk
-        dec_out[i : i + chunk_n] = dec_chunk
-        ridge_id_out[i : i + chunk_n] = label
-        i += chunk_n
-
-    output.metadata["n_filaments"] = len(filament_labels)
-
+    output.metadata["n_filaments"] = n_filament
     output.set_column("ra", ra_out)
     output.set_column("dec", dec_out)
     output.set_column("ridge_id", ridge_id_out)
-    output.save()
-    return output
+
+    if segmentation_config.do_spline:
+        if rank == 0:
+            print(f"Performing spline interpolation on the segmented ridges with n_points = {segmentation_config.n_spline_points} on {size} processes")
+        output = interpolate_segments(output, n_points=segmentation_config.n_spline_points, comm=comm)
+
+    if rank == 0:
+        output.save()
+        return output
 
 
 def measure_ridge_shear(shear_config: ShearConfig, comm=None):

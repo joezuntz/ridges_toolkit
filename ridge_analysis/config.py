@@ -60,12 +60,16 @@ class SegmentationConfig:
     ridge_file: str
     density_percentile: float = 0.0
     mst_neighbours: int = 10
+    do_spline: bool = False
+    n_spline_points: int = 100
 
     help = {
         "ridge_point_file": "Path to the input ridge point file (HDF5 format).",
         "ridge_file": "Path to the output ridge file (HDF5 format).",
         "density_percentile": "Percentile threshold for density to filter ridge points (0-100).",
-        "mst_neighbours": "Number of nearest neighbors to consider when building the minimum spanning tree for segmentation."
+        "mst_neighbours": "Number of nearest neighbors to consider when building the minimum spanning tree for segmentation.",
+        "do_spline": "Whether to perform spline interpolation on the segmented ridges.",
+        "spline_points": "Number of points to use for spline interpolation if do_spline is True."
     }   
 
 

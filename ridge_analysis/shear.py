@@ -287,7 +287,7 @@ def measure_shear(
         if source_coords is None:
             continue
 
-        if (rank == 0) and (filament_index % 10 == 0):
+        if (rank == 0) and (filament_index % 100 == 0):
             print(
                 f"[{rank}] Processing filament {filament_index} / {n_filaments} - {source_coords.shape[0]} nearby sources"
             )

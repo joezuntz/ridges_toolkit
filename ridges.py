@@ -106,10 +106,7 @@ def segment_ridges(global_config, segmentation_config):
     import mpi4py.MPI as MPI
     comm = MPI.COMM_WORLD
 
-    for i, b in enumerate(bins):
-        # The lens bins are split up among processes.
-        if i % comm.size != comm.rank:
-            continue
+    for b in bins:
         
         config = {
             "ridge_point_file": f"{ridge_dir}/ridge_points_{b}.hdf5",
@@ -117,7 +114,7 @@ def segment_ridges(global_config, segmentation_config):
         }
     
         config = ridge_analysis.SegmentationConfig(**config, **segmentation_config)
-        ridge_analysis.segment_ridges(config)
+        ridge_analysis.segment_ridges(config, comm=comm)
 
 def plot(global_config, plot_config):
     """

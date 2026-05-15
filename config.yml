@@ -31,6 +31,8 @@ dredge:
 segment:
     density_percentile: 0.0
     mst_neighbours: 10
+    do_spline: false
+    n_spline_points: 100
 
 plot:
     nside: 1024

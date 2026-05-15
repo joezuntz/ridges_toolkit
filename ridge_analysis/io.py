@@ -129,6 +129,9 @@ class RidgeSegmentCatalog(Catalog):
 
     def iterate_ridges(self, radians=False):
         self.load()
+        # Ridges are (now) stored in order of ridge id,
+        # so we can just find wherever the ridge ID increases and take
+        # those chunks as the ridges.
         change_points = np.where(np.diff(self.ridge_id) != 0)[0] + 1
         boundaries = np.concatenate(([0], change_points, [len(self.ridge_id)]))
         for i in range(len(boundaries) - 1):
