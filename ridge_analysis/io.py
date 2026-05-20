@@ -98,8 +98,8 @@ class Catalog:
         if "z" not in self.data:
             raise ValueError("No redshift information loaded")
         mask = (self.data["z"] >= zmin) & (self.data["z"] < zmax)
-        for col in self.columns:
-            self.data[col] = self.data[col][mask]
+        for col, data in list(self.data.items()):
+            self.data[col] = data[mask]
 
 
 class LensCatalog(Catalog):
@@ -118,8 +118,8 @@ class RidgePointCatalog(Catalog):
     def apply_density_cut(self, percentile):
         density_threshold = np.percentile(self.density, percentile)
         mask = self.density >= density_threshold
-        for col in self.columns:
-            self.data[col] = self.data[col][mask]
+        for col, data in list(self.data.items()):
+            self.data[col] = data[mask]
 
     # TODO: Adapt function to trim around edges below
 
