@@ -21,7 +21,9 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
     lens_catalog.load(comm=comm, split_over_ranks=False)
 
     # Apply any redshift cuts
-    if dredge_config.lens_zmin is not None or dredge_config.lens_zmax is not None:
+    need_zmin = (dredge_config.lens_zmin is not None) and (dredge_config.lens_zmin != 0)
+    need_zmax = (dredge_config.lens_zmax is not None) and (dredge_config.lens_zmax < 99.99)
+    if need_zmin or need_zmax:
         lens_catalog.cut_to_redshift_range(dredge_config.lens_zmin, dredge_config.lens_zmax)
 
     coordinates = lens_catalog.dec_ra_in_radians()
