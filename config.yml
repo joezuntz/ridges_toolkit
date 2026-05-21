@@ -1,6 +1,6 @@
 global:
     catalog_dir: ./example
-    ridge_dir: ./example
+    ridge_dir: ./jax-example
     segment_dir: ./example
     plot_dir: ./example
     shear_dir: ./example
@@ -25,7 +25,7 @@ simulate:
 
 dredge:
     seed: 888
-    num_ridge_points: 1000000
+    num_ridge_points: 10000
     shift_180: true
 
 segment:

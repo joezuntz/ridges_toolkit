@@ -205,7 +205,7 @@ def find_filaments(
 
         # Update the points in the mesh. Record the timing
         t = timer()
-        updates = ridge_update(ridges_subset, coordinates, bandwidth, tree, n_neighbors)
+        ridges_subset, updates = ridge_update(ridges_subset, coordinates, bandwidth, tree, n_neighbors)
         time_taken = timer() - t
 
         # Copy the update from this set of ridges to the full set
