@@ -37,8 +37,9 @@ def make_tree(coordinates, metric="haversine", tree_file=None):
         with open(tree_file, "rb") as f:
             tree = pickle.load(f)
     else:
-        print("Building tree from coordinates")
-        tree = BallTree(coordinates, metric=metric)
+        leaf_size = 100
+        print("Building tree from coordinates with metric =", metric, "and leaf_size =", leaf_size)
+        tree = BallTree(coordinates, metric=metric, leaf_size=leaf_size)
 
     # Save the tree file if it does not exist
     if save_tree:
@@ -49,7 +50,7 @@ def make_tree(coordinates, metric="haversine", tree_file=None):
     return tree
 
 
-def query_tree(tree, points, n_neighbors):
+def query_tree(tree: BallTree, points, n_neighbors):
     """
     Query a KD Tree to find the nearest neighbors for a set of points,
     optionally using parallel processing. Despite the name, the n_process
@@ -77,8 +78,8 @@ def query_tree(tree, points, n_neighbors):
         An array of distances to the nearest neighbors for
         each input point.
     """
-    distances, indices = tree.query(points, k=n_neighbors, return_distance=True)
-    return indices, distances
+    distances, indices = tree.query(points, k=n_neighbors, return_distance=True, breadth_first=True, dualtree=False)
+    return indices, distances.astype(data_type)
 
 
 def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
