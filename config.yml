@@ -36,7 +36,7 @@ segment:
 
 plot:
     nside: 1024
-    smoothing: 0.2
+    smoothing_degrees: 0.1
 
 shear:
     flip_g1: false
