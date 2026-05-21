@@ -79,7 +79,7 @@ def query_tree(tree: BallTree, points, n_neighbors):
         each input point.
     """
     distances, indices = tree.query(points, k=n_neighbors, return_distance=True, breadth_first=True)
-    return indices, distances.astype
+    return indices, distances
 
 
 def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
