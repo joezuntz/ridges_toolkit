@@ -78,8 +78,8 @@ def query_tree(tree: BallTree, points, n_neighbors):
         An array of distances to the nearest neighbors for
         each input point.
     """
-    distances, indices = tree.query(points, k=n_neighbors, return_distance=True, breadth_first=True, dualtree=False)
-    return indices, distances.astype(data_type)
+    distances, indices = tree.query(points, k=n_neighbors, return_distance=True, breadth_first=True)
+    return indices, distances.astype
 
 
 def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
