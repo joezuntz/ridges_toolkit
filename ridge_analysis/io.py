@@ -81,6 +81,7 @@ class Catalog:
                     if col not in f and col not in self.optional_columns:
                         raise ValueError(f"Column {col} not found in file {self.filename}")
                     elif col in f:
+                        print("Loading column", col, "with shape", f[col].shape, "and dtype", f[col].dtype)
                         self.data[col] = f[col][slc]
 
         # In this case every process should get all the catalog
