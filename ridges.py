@@ -1,4 +1,3 @@
-import ridge_sims
 import ridge_analysis
 import ridge_analysis.plots
 import yaml
@@ -25,6 +24,7 @@ def simulate(global_config, simulation_config):
         set the parameters for the simulation, such as nside, dx, cosmological parameters, etc.    
     """
     # Build the configuration object
+    import ridge_sims
     sim_dir = global_config["catalog_dir"]
     config = ridge_sims.Config(sim_dir=sim_dir, **simulation_config)
     config.save()
