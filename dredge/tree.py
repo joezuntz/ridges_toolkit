@@ -214,11 +214,9 @@ def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
         A filtered array of points from `ridges` that meet the distance criteria.
 
     """
-    pbar = tqdm.tqdm(total=len(ridges), desc="Filtering points with tree")
     keep = np.zeros(len(ridges), dtype=bool)
     for i, (theta, phi) in enumerate(ridges):
         theta = np.pi/2 - theta
         indices, _ = tree.query_radius(theta, phi, threshold * bandwidth)
         keep[i] = len(indices) > 0
-        pbar.update(1)
     return ridges[keep]

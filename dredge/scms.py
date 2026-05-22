@@ -40,7 +40,9 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
         distance = all_distances[i][:count].copy()
         nearby_coordinates = coordinates[nearby_indices].copy()
 
-        updates[i] = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
+        updates[i], status = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
+        if status == 1:
+            fail_mask[i] = 1
 
         # Store the change between updates to check convergence
         update_sizes[i] = np.sum(np.abs(updates[i]))
@@ -108,6 +110,9 @@ def update_function(point, coordinates, bandwidth, distance):
     squared_distance = distance**2
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth)
+
+    if np.sum(weights) == 0:
+        return np.zeros_like(point), 1
     # now reweight each point
     shift = coordinates.T @ weights / np.sum(weights)
     # first, we evaluate the mean shift update
@@ -124,7 +129,7 @@ def update_function(point, coordinates, bandwidth, distance):
     # Project the update to the eigenvector-spanned orthogonal subspace
     point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)
     # Return the projections as the point updates
-    return point_updates
+    return point_updates, 0
 
 
 @njit
