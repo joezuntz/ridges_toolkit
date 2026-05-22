@@ -122,7 +122,7 @@ def update_function(point, coordinates, bandwidth, distance):
     inverse_covariance, status = local_inv_cov(point, coordinates, bandwidth)
     if status == 1:
         return np.zeros_like(point), 1
-    if np.any(np.isnan(inverse_covariance))):
+    if np.any(np.isnan(inverse_covariance)):
         print("NaN in inverse covariance matrix, returning zero update")
         return np.zeros_like(point), 1
     elif np.any(np.isinf(inverse_covariance)):
