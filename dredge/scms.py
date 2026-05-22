@@ -303,8 +303,7 @@ def local_inv_cov(point, coordinates, bandwidth):
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
 
     if not np.isfinite(inv_cov).all():
-        print(*locals())
-        raise ValueError("Non-finite weight average in local_inv_cov")
+        raise ValueError("Non-finite weight average in local_inv_cov" + str(locals()))
 
 
     return inv_cov, 0
