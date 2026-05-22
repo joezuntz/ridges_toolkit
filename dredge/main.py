@@ -157,9 +157,11 @@ def find_filaments(
     # remove any ridges that are more than mesh_threshold bandwidths from any point
     # We do the cutting here on the root process so that each process actually does get the
     # same number of points to work with.
-    print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
+    if is_root:
+        print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
     ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
-    print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
+    if is_root:
+        print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
 
 
     # Record the initial density of all the points to allow us to do cuts later

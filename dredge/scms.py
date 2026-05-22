@@ -111,23 +111,14 @@ def update_function(point, coordinates, bandwidth, distance):
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth)
     weight_sum = np.sum(weights)
-
-    if weight_sum == 0:
+    if weight_sum < 1e-30:
         return np.zeros_like(point), 1
     # now reweight each point
     shift = coordinates.T @ weights / weight_sum
     # first, we evaluate the mean shift update
     update = shift - point
     # Calculate the local inverse covariance for the decomposition
-    inverse_covariance, status = local_inv_cov(point, coordinates, bandwidth)
-    if status == 1:
-        return np.zeros_like(point), 1
-    if np.any(np.isnan(inverse_covariance)):
-        print("NaN in inverse covariance matrix, returning zero update")
-        return np.zeros_like(point), 1
-    elif np.any(np.isinf(inverse_covariance)):
-        print("Infinite value in inverse covariance matrix, returning zero update")
-        return np.zeros_like(point), 1
+    inverse_covariance = local_inv_cov(point, coordinates, bandwidth)
     # Compute the eigendecomposition of the local inverse covariance
     eigen_values, eigen_vectors = np.linalg.eig(inverse_covariance)
     # Align the eigenvectors with the sorted eigenvalues
@@ -286,8 +277,6 @@ def local_inv_cov(point, coordinates, bandwidth):
     # Compute the weight kernels called b_j in the paper
     weights = gaussian_kernel(squared_distance, bandwidth)
     weight_sum = np.sum(weights)
-    if weight_sum == 0:
-        return np.zeros((number_columns, number_columns)), 1
     weight_average = weight_sum / number_points
 
     # Compute the location differences between the point and the dataset
@@ -302,11 +291,7 @@ def local_inv_cov(point, coordinates, bandwidth):
     grad = -mean1(weights * mu.T)
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
 
-    if not np.isfinite(inv_cov).all():
-        raise ValueError("Non-finite weight average in local_inv_cov" + str(locals()))
-
-
-    return inv_cov, 0
+    return inv_cov
 
 
 def mesh_generation(coordinates, num_ridge_points, seed=None):
