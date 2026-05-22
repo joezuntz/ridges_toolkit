@@ -137,26 +137,19 @@ def find_filaments(
     if checkpoint_dir is not None and is_root:
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Only the root process makes the mesh and the tree, so that
+    # Only the root process makes the tree, so that
     # every process is using the exact same one.
     if is_root:
-        print("Generated mesh.  Making tree.")
-
         # Make the ball tree to speed up finding nearby points
+        print("Generated mesh.  Making tree.")
         tree = make_tree(coordinates, tree_nside)
-
-
     else:
-        # Other processes do not make them, but instead are sent them just below
-        # here
         tree = None
-        ridges = None
 
     if comm is not None:
-        # These commands send a copy of the tree and the ridges
+        # These commands send a copy of the tree
         # to all the processes
         tree = comm.bcast(tree, root=0)
-        ridges = comm.bcast(ridges, root=0)
 
     my_num_ridge_points = num_ridge_points // comm_size
     # Create an evenly-spaced mesh in for the provided coordinates
