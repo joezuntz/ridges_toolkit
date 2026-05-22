@@ -289,9 +289,6 @@ def local_inv_cov(point, coordinates, bandwidth):
     if weight_sum == 0:
         return np.zeros((number_columns, number_columns)), 1
     weight_average = weight_sum / number_points
-    if not np.isfinite(weight_average):
-        print(*locals())
-        raise ValueError("Non-finite weight average in local_inv_cov")
 
     # Compute the location differences between the point and the dataset
     mu = (coordinates - point) / bandwidth**2
@@ -304,6 +301,12 @@ def local_inv_cov(point, coordinates, bandwidth):
     # This is an extra term that is not in the paper
     grad = -mean1(weights * mu.T)
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
+
+    if not np.isfinite(inv_cov).all():
+        print(*locals())
+        raise ValueError("Non-finite weight average in local_inv_cov")
+
+
     return inv_cov, 0
 
 
