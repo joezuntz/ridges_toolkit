@@ -119,6 +119,8 @@ def update_function(point, coordinates, bandwidth, distance):
     update = shift - point
     # Calculate the local inverse covariance for the decomposition
     inverse_covariance = local_inv_cov(point, coordinates, bandwidth)
+    if np.any(~np.isfinite(inverse_covariance)):
+        return np.zeros_like(point), 1
     # Compute the eigendecomposition of the local inverse covariance
     eigen_values, eigen_vectors = np.linalg.eig(inverse_covariance)
     # Align the eigenvectors with the sorted eigenvalues
