@@ -110,15 +110,18 @@ def update_function(point, coordinates, bandwidth, distance):
     squared_distance = distance**2
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth)
+    weight_sum = np.sum(weights)
 
-    if np.sum(weights) == 0:
+    if weight_sum == 0:
         return np.zeros_like(point), 1
     # now reweight each point
-    shift = coordinates.T @ weights / np.sum(weights)
+    shift = coordinates.T @ weights / weight_sum
     # first, we evaluate the mean shift update
     update = shift - point
     # Calculate the local inverse covariance for the decomposition
-    inverse_covariance = local_inv_cov(point, coordinates, bandwidth)
+    inverse_covariance, status = local_inv_cov(point, coordinates, bandwidth)
+    if status == 1:
+        return np.zeros_like(point), 1
     # Compute the eigendecomposition of the local inverse covariance
     eigen_values, eigen_vectors = np.linalg.eig(inverse_covariance)
     # Align the eigenvectors with the sorted eigenvalues
@@ -277,6 +280,8 @@ def local_inv_cov(point, coordinates, bandwidth):
     # Compute the weight kernels called b_j in the paper
     weights = gaussian_kernel(squared_distance, bandwidth)
     weight_sum = np.sum(weights)
+    if weight_sum == 0:
+        return np.zeros((number_columns, number_columns)), 1
     weight_average = weight_sum / number_points
 
     # Compute the location differences between the point and the dataset
@@ -290,7 +295,7 @@ def local_inv_cov(point, coordinates, bandwidth):
     # This is an extra term that is not in the paper
     grad = -mean1(weights * mu.T)
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
-    return inv_cov
+    return inv_cov, 0
 
 
 def mesh_generation(coordinates, num_ridge_points, seed=None):
