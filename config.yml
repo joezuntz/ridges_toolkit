@@ -25,9 +25,9 @@ simulate:
 
 dredge:
     seed: 888
-    num_ridge_points: 10000
+    num_ridge_points: 1000000
     shift_180: true
-    tree_nside: 32
+    tree_nside: 128
 
 segment:
     density_percentile: 0.0
