@@ -153,7 +153,7 @@ def find_filaments(
 
     my_num_ridge_points = num_ridge_points // comm_size
     # Create an evenly-spaced mesh in for the provided coordinates
-    ridges = mesh_generation(coordinates, my_num_ridge_points, seed)
+    ridges = mesh_generation(coordinates, my_num_ridge_points, [seed, rank])
     # remove any ridges that are more than mesh_threshold bandwidths from any point
     # We do the cutting here on the root process so that each process actually does get the
     # same number of points to work with.
