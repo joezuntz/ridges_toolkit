@@ -14,13 +14,13 @@ def ridge_update(ridges, coordinates, bandwidth, tree, weights=None):
     all_nearby_indices, all_counts, all_distances = query_tree(tree, ridges, bandwidth*NUM_BANDWIDTHS_QUERY)
 
     if weights is None:
-        updates = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, all_counts)
+        updates, fail_mask = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, all_counts)
     else:
         raise NotImplementedError("Weighted updates are not yet implemented")
-        updates = weighted_ridge_update_inner(
+        updates, fail_mask = weighted_ridge_update_inner(
             ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights
         )
-    return updates
+    return updates, fail_mask
 
 
 @njit(parallel=True)
@@ -28,11 +28,13 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
     # Create a list to store all update values
     update_sizes = np.zeros(ridges.shape[0])
     updates = np.zeros(ridges.shape)
+    fail_mask = np.zeros(ridges.shape[0], dtype=np.int8)
     for i in prange(ridges.shape[0]):
         # Compute the update movements for each point
         # get all the points within the 3 sigma bandwidth
         count = all_counts[i]
         if count == 0:
+            fail_mask[i] = 1
             continue
         nearby_indices = all_nearby_indices[i][:count].copy()
         distance = all_distances[i][:count].copy()
@@ -43,7 +45,7 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
         # Store the change between updates to check convergence
         update_sizes[i] = np.sum(np.abs(updates[i]))
     ridges += updates
-    return update_sizes
+    return update_sizes, fail_mask
 
 
 @njit(parallel=True)

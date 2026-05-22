@@ -192,6 +192,7 @@ def find_filaments(
     index = np.arange(ridges.shape[0])
     n_to_update = points_to_update.sum()
     print(f"[Proc {rank}]: iteration {iteration_number}  {n_to_update} points to iterate.")
+    fail_mask = np.zeros(ridges.shape[0], dtype=bool)
 
     # Wait until almost all points have converged. Towards the end the
     # points will be updating very quickly as there are so few of them.
@@ -204,11 +205,18 @@ def find_filaments(
 
         # Update the points in the mesh. Record the timing
         t = timer()
-        updates = ridge_update(ridges_subset, coordinates, bandwidth, tree)
+        updates, subset_fail_mask = ridge_update(ridges_subset, coordinates, bandwidth, tree)
         time_taken = timer() - t
 
         # Copy the update from this set of ridges to the full set
         ridges[subset_index] = ridges_subset
+
+        # Some points will get zero updates because they have no points in the bandwidth.
+        # This can happen when the previous update moved them to a masked
+        # region. These points will automatically be removed from the updating
+        # process because they didn't move, but we also want to not
+        # return them at the end of the process, so mark them here.
+        fail_mask[subset_index] = subset_fail_mask
 
         # Find which points have converged, and mark in the list of
         # the full set of ridges that they have done so.
@@ -234,6 +242,10 @@ def find_filaments(
                 time_of_last_checkpoint = timer()
                 # Save the current state of the ridges and points to update
                 checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
+
+    nfail = fail_mask.sum()
+    print(f"Rank {rank} finshed and removing {nfail}/{fail_mask.size} points that lost neighbours")
+    ridges = ridges[~fail_mask]
 
     # We also record the density at the end of the iterations - we may want to cut
     # to high density ridges only.
