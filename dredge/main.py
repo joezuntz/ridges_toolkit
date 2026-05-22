@@ -131,6 +131,7 @@ def find_filaments(
     # parallelization information
     is_root = comm is None or comm.rank == 0
     rank = 0 if comm is None else comm.rank
+    comm_size = 1 if comm is None else comm.size
 
     # make checkpointing directory if it does not exist
     if checkpoint_dir is not None and is_root:
@@ -140,18 +141,10 @@ def find_filaments(
     # every process is using the exact same one.
     if is_root:
         print("Generated mesh.  Making tree.")
-        # Create an evenly-spaced mesh in for the provided coordinates
-        ridges = mesh_generation(coordinates, num_ridge_points, seed)
 
         # Make the ball tree to speed up finding nearby points
         tree = make_tree(coordinates, tree_nside)
 
-        # remove any ridges that are more than mesh_threshold bandwidths from any point
-        # We do the cutting here on the root process so that each process actually does get the
-        # same number of points to work with.
-        print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
-        ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
-        print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
 
     else:
         # Other processes do not make them, but instead are sent them just below
@@ -165,9 +158,16 @@ def find_filaments(
         tree = comm.bcast(tree, root=0)
         ridges = comm.bcast(ridges, root=0)
 
-        # Split up the ridges so that each process gets an
-        # evenly sized subset.
-        ridges = np.array_split(ridges, comm.size)[comm.rank]
+    my_num_ridge_points = num_ridge_points // comm_size
+    # Create an evenly-spaced mesh in for the provided coordinates
+    ridges = mesh_generation(coordinates, my_num_ridge_points, seed)
+    # remove any ridges that are more than mesh_threshold bandwidths from any point
+    # We do the cutting here on the root process so that each process actually does get the
+    # same number of points to work with.
+    print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
+    ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
+    print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
+
 
     # Record the initial density of all the points to allow us to do cuts later
     initial_density = estimate_local_density(tree, ridges, bandwidth, weights)
