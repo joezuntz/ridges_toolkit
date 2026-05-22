@@ -281,6 +281,9 @@ def local_inv_cov(point, coordinates, bandwidth):
     weight_sum = np.sum(weights)
     weight_average = weight_sum / number_points
 
+    if not (weight_average**2 > 0):
+        return np.zeros((number_columns, number_columns)), 1
+
     # Compute the location differences between the point and the dataset
     mu = (coordinates - point) / bandwidth**2
 
@@ -293,7 +296,7 @@ def local_inv_cov(point, coordinates, bandwidth):
     grad = -mean1(weights * mu.T)
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
 
-    return inv_cov
+    return inv_cov, 0
 
 
 def mesh_generation(coordinates, num_ridge_points, seed=None):
