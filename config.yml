@@ -1,6 +1,6 @@
 global:
     catalog_dir: ./example
-    ridge_dir: ./example
+    ridge_dir: ./example-tree
     segment_dir: ./example
     plot_dir: ./example
     shear_dir: ./example
@@ -25,8 +25,9 @@ simulate:
 
 dredge:
     seed: 888
-    num_ridge_points: 1000000
+    num_ridge_points: 10000
     shift_180: true
+    tree_nside: 32
 
 segment:
     density_percentile: 0.0

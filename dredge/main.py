@@ -15,8 +15,7 @@ def find_filaments(
     max_unconverged_fraction=0.005,
     max_iterations=5000,
     num_ridge_points=None,
-    n_neighbors=5000,
-    distance_metric="haversine",
+    tree_nside=128,
     mesh_threshold=4.0,
     checkpoint_dir=None,
     min_checkpoint_gap=30,
@@ -66,9 +65,9 @@ def find_filaments(
     num_ridge_points : int, defaults to None
         The number of mesh points to be used to generate ridges.
 
-    n_neighbors : int, defaults to 5000
-        The number of nearest neighbour points used to update ridge points.
-        You should check convergence of this parameter for your use case.
+    tree_nside : int, defaults to 128
+        The nside parameter of the tree-like structure used in finding
+        nearby points.
 
     distance_metric: string, defaults to 'haversine'
         The distance function to be used, can be 'haversine' or 'euclidean'.
@@ -145,7 +144,7 @@ def find_filaments(
         ridges = mesh_generation(coordinates, num_ridge_points, seed)
 
         # Make the ball tree to speed up finding nearby points
-        tree = make_tree(coordinates, distance_metric, tree_file)
+        tree = make_tree(coordinates, tree_nside)
 
         # remove any ridges that are more than mesh_threshold bandwidths from any point
         # We do the cutting here on the root process so that each process actually does get the
@@ -205,7 +204,7 @@ def find_filaments(
 
         # Update the points in the mesh. Record the timing
         t = timer()
-        updates = ridge_update(ridges_subset, coordinates, bandwidth, tree, n_neighbors)
+        updates = ridge_update(ridges_subset, coordinates, bandwidth, tree)
         time_taken = timer() - t
 
         # Copy the update from this set of ridges to the full set
@@ -258,11 +257,15 @@ def find_filaments(
 
 
 def estimate_local_density(tree, coordinates, bandwidth, weights=None):
-    if weights is None:
-        return tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=True)
-
-    nearby_points = tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=False)
-    return np.array([weights[points].sum() for points in nearby_points])
+    density = np.zeros(len(coordinates))
+    for i, (theta, phi) in enumerate(coordinates):
+        theta = np.pi/2 - theta
+        points, _ =tree.query_radius(theta, phi, bandwidth)
+        if weights is None:
+            density[i] = len(points)
+        else:
+            density[i] = weights[points].sum()
+    return density
 
 
 def parameter_check(**p):
@@ -282,11 +285,10 @@ def parameter_check(**p):
     """
 
     coordinates = p["coordinates"]
-    n_neighbours = p["n_neighbors"]
     bandwidth = p["bandwidth"]
     convergence = p["convergence"]
     num_ridge_points = p["num_ridge_points"]
-    distance_metric = p["distance_metric"]
+    tree_nside = p["tree_nside"]
     mesh_threshold = p["mesh_threshold"]
     checkpoint_dir = p["checkpoint_dir"]
     resume = p["resume"]
@@ -304,9 +306,9 @@ def parameter_check(**p):
     if np.any(np.isnan(coordinates)) or np.any(np.isinf(coordinates)):
         raise ValueError("ERROR: coordinates must not contain NaN or Inf values.")
 
-    # Check whether neighbors is a positive integer or float
-    if not (isinstance(n_neighbours, int) and n_neighbours > 0):
-        raise ValueError("ERROR: n_neighbors must be an integer > 0")
+    # Check whether tree_nside is a positive integer
+    if not (isinstance(tree_nside, int) and tree_nside > 0):
+        raise ValueError("ERROR: tree_nside must be a positive integer")
 
     # Check whether bandwidth is a positive float
     if not (isinstance(bandwidth, float) and bandwidth > 0):
@@ -319,10 +321,6 @@ def parameter_check(**p):
     # Check whether num_ridge_points is a positive integer
     if not (isinstance(num_ridge_points, int) and num_ridge_points > 0):
         raise ValueError("ERROR: num_ridge_points must be a positive integer")
-
-    # Check whether distance is one of two allowed strings
-    if distance_metric not in ["haversine", "euclidean"]:
-        raise ValueError("ERROR: distance must be either 'haversine' or 'euclidean'")
 
     # Check whether mesh_threshold is a positive float or int
     if not (isinstance(mesh_threshold, (float, int)) and mesh_threshold > 0):
