@@ -1,9 +1,9 @@
 global:
     catalog_dir: ./example
     ridge_dir: ./example-tree
-    segment_dir: ./example
+    segment_dir: ./example-tree
     plot_dir: ./example
-    shear_dir: ./example
+    shear_dir: ./example-tree
     lens_bins: [0]
     source_bins: [0]
 
@@ -45,4 +45,4 @@ shear:
     num_bins: 20
     min_distance_arcmin: 1.0
     max_distance_arcmin: 60.0
-    nside_coverage: 32
+    nside_coverage: 128

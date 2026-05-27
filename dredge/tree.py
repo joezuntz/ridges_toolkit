@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pickle
 from sklearn.neighbors import BallTree
+from .utils import haversine_distance
 
 import numpy as np
 import healpy as hp
@@ -103,18 +104,6 @@ def _query_core(theta_query, phi_query, theta_bg, phi_bg, radius, nearby_pixels,
     output = output[distance < radius]
     # return the indices of the points within the radius
     return output, distance[distance < radius]
-
-@numba.njit
-def haversine_distance(theta1, phi1, theta2, phi2):
-    """
-    Compute the haversine distance between two points on the sphere.
-    """
-    dlon = phi2 - phi1
-    dlat = theta2 - theta1
-    a = np.sin(dlat/2)**2 + np.cos(theta1) * np.cos(theta2) * np.sin(dlon/2)**2
-    c = 2 * np.arcsin(np.sqrt(a))
-    return c
-
 
 
 def make_tree(coordinates, tree_nside):

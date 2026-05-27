@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import healpy as hp
 from astropy.table import Table
-
+import gc
 
 class Catalog:
     """
@@ -95,6 +95,11 @@ class Catalog:
             self.metadata = dict(f.attrs)
 
         self.loaded = True
+
+    def unload(self):
+        self.data = {}
+        self.loaded = False
+        gc.collect()
 
     def cut_to_redshift_range(self, zmin, zmax):
         if "z" not in self.data:
