@@ -7,8 +7,8 @@ import gc
 import time
 
 
-folder = os.path.dirname(os.path.abspath(__file__))
-f = h5py.File(folder+'/data/projected_probes_maps_v11dmb.h5')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+f = h5py.File(current_dir+'/data/projected_probes_maps_v11dmb.h5')
 
 
 def initialize_catalogue(filename):
@@ -383,18 +383,21 @@ def main():
 
     start_time = time.time()
 
-    gold_mask = np.load(folder+'/data/desy3_gold_mask.npy')
+    gold_mask = np.load(current_dir+'/data/desy3_gold_mask.npy')
     mask = np.zeros(hp.nside2npix(4096))
     mask[gold_mask] = 1.
     mask = hp.ud_grade(mask, nside_out=1024, order_in='RING', order_out='RING')
     mask = hp.reorder(mask, n2r=True)
     mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
 
-    for i in range(nbins):
+    path = current_dir+'/data/catalogues/'
+    if not os.path.exists(path):
+        os.makedirs(path)
 
+    for i in range(nbins):
         print('Processing bin '+str(i+1)+'/'+str(nbins))
-        filenames = {'lens': '/data/catalogues/lens_catalog_'+str(i)+'.hdf5',
-                    'source': '/data/catalogues/source_catalog_'+str(i)+'.hdf5'}
+        filenames = {'lens': 'lens_catalog_'+str(i)+'.hdf5',
+                    'source': 'source_catalog_'+str(i)+'.hdf5'}
         
         maps2catalogues(
             filenames=filenames,
@@ -403,7 +406,7 @@ def main():
             mask=mask,
             bin_i=i,
             include_kappa=True,
-            path_to_files=folder
+            path_to_files=path
         )    
         print(f'Done with bin {i+1}')
 
