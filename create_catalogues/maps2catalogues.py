@@ -136,9 +136,9 @@ def append_shear_to_hdf5(f, ra, dec, gamma1, gamma2, weight, kappa=None):
         f['kappa'][old_size:new_size] = kappa
 
 
-def extract_poisson_position_from_map(map, n_density):
+def extract_poisson_counts_from_map(map, n_density):
     '''
-    Extracts galaxy positions from given map using Poisson sampling.
+    Extract galaxy counts from a density map by Poisson sampling.
 
     Parameters
     ----------
@@ -149,7 +149,7 @@ def extract_poisson_position_from_map(map, n_density):
 
     Returns
     -------
-    galaxy_position : array
+    gal_counts : array
         Array of galaxy counts for each pixel, sampled from a Poisson distribution
     '''
     nside = hp.get_nside(map)
@@ -159,7 +159,8 @@ def extract_poisson_position_from_map(map, n_density):
     nbar = n_density * (1. + map) * pixel_area
     nbar[nbar<0] = 0
 
-    return np.random.poisson(nbar)
+    gal_counts = np.random.poisson(nbar)
+    return gal_counts
 
 
 def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, chunk_size=10_000):
@@ -182,22 +183,26 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
     delta_g = delta_g - np.mean(delta_g)
 
     nside = hp.get_nside(delta_g)
-    galaxy_position = extract_poisson_position_from_map(delta_g, number_density)
+    # get map of galaxy counts with Poisson distribution
+    galaxy_counts = extract_poisson_counts_from_map(delta_g, number_density)
 
     f = h5py.File(h5filename, 'a')
 
-    for start in range(0, len(galaxy_position), chunk_size):
-        end = min(start + chunk_size, len(galaxy_position))
-        counts_chunk = galaxy_position[start:end]
+    for start in range(0, len(galaxy_counts), chunk_size):
+        end = min(start + chunk_size, len(galaxy_counts))
+        galaxy_counts_chunk = galaxy_counts[start:end]
 
         pix_chunk = np.arange(start, end)
         
         if mask is not None:
+            # consider only pixels in the chunk
             mask_chunk = mask[pix_chunk]
+            # mask pixels (needs to be of the same len of galaxy_counts_chunkonce masked)
             pix_chunk = pix_chunk[mask_chunk]
-            counts_chunk = counts_chunk[mask_chunk]
+            # mask galaxy counts
+            galaxy_counts_chunk = galaxy_counts_chunk[mask_chunk]
 
-        pixels = np.repeat(pix_chunk, counts_chunk)
+        pixels = np.repeat(pix_chunk, galaxy_counts_chunk)
 
         if len(pixels) == 0:
             continue
@@ -390,7 +395,7 @@ def main():
     mask = hp.reorder(mask, n2r=True)
     mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
 
-    path = current_dir+'/data/catalogues/'
+    path = current_dir#+'/data/catalogues/'
     if not os.path.exists(path):
         os.makedirs(path)
 
