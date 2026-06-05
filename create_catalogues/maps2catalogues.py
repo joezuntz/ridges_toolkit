@@ -10,6 +10,7 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 f = h5py.File(current_dir+'/data/projected_probes_maps_v11dmb.h5')
 
+resolution = 4096
 
 def initialize_catalogue(filename):
     # Delete existing file if it exists
@@ -212,6 +213,8 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
         dec = 90. - np.degrees(theta)
 
         append_to_hdf5(f, ra, dec)
+    # print total number of galaxy (after mask)
+    print(f'Total number of galaxies: {len(f["ra"])/1e6:.2f} million')
     f.close()
 
 
@@ -326,12 +329,15 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
     '''
 
     dg_cat_maglim_hd5  = initialize_catalogue(path_to_files + filenames['lens'])
-    dg_cat_metacal_hd5 = initialize_catalogue(path_to_files + '/data/catalogues/dg_metacal_catalogue.hdf5',)
+    dg_cat_metacal_hd5 = initialize_catalogue(path_to_files + 'dg_metacal_catalogue.hdf5',)
     gamma_cat_h5 = initialize_shear_catalogue(path_to_files + filenames['source'], include_kappa)
 
     # Load overdensity maps from CosmoGrid
     dg_maglim_map = np.array(f['map']['dg']['maglim'+str(bin_i+1)])
     dg_metacal_map = np.array(f['map']['dg']['metacal'+str(bin_i+1)])
+
+    dg_maglim_map = hp.ud_grade(dg_maglim_map, nside_out=resolution, order_in='RING', order_out='RING')
+    dg_metacal_map = hp.ud_grade(dg_metacal_map, nside_out=resolution, order_in='RING', order_out='RING')
 
     # Make lens and source density catalogue (and write it on hdf5 file)
     print('Making galaxy catalogues...')
@@ -351,7 +357,7 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
     # Load convergence maps from CosmoGrid
     m = f['map']['kg']['metacal'+str(bin_i+1)][:]
     kappa_metacal_map = m - np.mean(m)
-
+    kappa_metacal_map = hp.ud_grade(kappa_metacal_map, nside_out=resolution, order_in='RING', order_out='RING')
 
     kappa_lm = hp.sphtfunc.map2alm(kappa_metacal_map)
     lmax = hp.Alm.getlmax(len(kappa_lm))
@@ -363,7 +369,7 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
 
     # Convert shear lm to shear map
     zeros = np.zeros_like(gamma_lm)
-    g1, g2 = hp.alm2map_spin([gamma_lm, zeros], 1024, lmax=lmax, spin=2) 
+    g1, g2 = hp.alm2map_spin([gamma_lm, zeros], resolution, lmax=lmax, spin=2) 
 
     # Write shear catalogue in an hdf5 file
     print('Making shear catalogue...')
@@ -384,25 +390,25 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
 def main():
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
-    nbins = 4
+    nbins = 1
 
     start_time = time.time()
 
     gold_mask = np.load(current_dir+'/data/desy3_gold_mask.npy')
     mask = np.zeros(hp.nside2npix(4096))
     mask[gold_mask] = 1.
-    mask = hp.ud_grade(mask, nside_out=1024, order_in='RING', order_out='RING')
+    mask = hp.ud_grade(mask, nside_out=resolution, order_in='RING', order_out='RING')
     mask = hp.reorder(mask, n2r=True)
     mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
-
-    path = current_dir#+'/data/catalogues/'
+    
+    path = current_dir+'/data/catalogues/'
     if not os.path.exists(path):
         os.makedirs(path)
 
     for i in range(nbins):
         print('Processing bin '+str(i+1)+'/'+str(nbins))
-        filenames = {'lens': 'lens_catalog_'+str(i)+'.hdf5',
-                    'source': 'source_catalog_'+str(i)+'.hdf5'}
+        filenames = {'lens': 'lens_catalog_'+str(resolution)+'_'+str(i)+'.hdf5',
+                    'source': 'source_catalog_'+str(resolution)+'_'+str(i)+'.hdf5'}
         
         maps2catalogues(
             filenames=filenames,
