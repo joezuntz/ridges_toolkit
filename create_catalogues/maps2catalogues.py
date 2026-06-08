@@ -7,34 +7,29 @@ import gc
 import time
 
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-f = h5py.File(current_dir+'/data/projected_probes_maps_v11dmb.h5')
 
-resolution = 4096
+resolution = 1024
+mask_nside = 4096
+
+
+def _create_resizable_dataset(group, name, dtype):
+    group.create_dataset(
+        name,
+        shape=(0,),
+        maxshape=(None,),
+        dtype=dtype,
+        chunks=True,
+        compression='gzip',
+        shuffle=True
+    )
 
 def initialize_catalogue(filename):
     # Delete existing file if it exists
     if os.path.exists(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
-        f.create_dataset(
-            'ra',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
-        f.create_dataset(
-            'dec',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
+        for field in ['ra', 'dec']:
+            _create_resizable_dataset(f, field, np.float64)
     return filename
 
 def initialize_shear_catalogue(filename, include_kappa=False):
@@ -42,61 +37,11 @@ def initialize_shear_catalogue(filename, include_kappa=False):
     if os.path.exists(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
-        f.create_dataset(
-            'ra',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
-        f.create_dataset(
-            'dec',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
-        f.create_dataset(
-            'g1',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
-        f.create_dataset(
-            'g2',
-            shape=(0,),
-            maxshape=(None,),
-            dtype=np.float64,
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
-        f.create_dataset(
-            'weight',
-            shape=(0,),
-            maxshape=(None,),
-            dtype='i2',
-            chunks=True,
-            compression='gzip',
-            shuffle=True
-        )
+        for field in ['ra', 'dec', 'g1', 'g2']:
+            _create_resizable_dataset(f, field, np.float64)
+        _create_resizable_dataset(f, 'weight', 'i2')
         if include_kappa:
-            f.create_dataset(
-                'kappa',
-                shape=(0,),
-                maxshape=(None,),
-                dtype=np.float64,
-                chunks=True,
-                compression='gzip',
-                shuffle=True
-            )
+            _create_resizable_dataset(f, 'kappa', np.float64)
     return filename
 
 def append_to_hdf5(f, ra, dec):
@@ -104,13 +49,9 @@ def append_to_hdf5(f, ra, dec):
     old_size = len(f['ra'])
     new_size = old_size + n_new
 
-    # resize
-    f['ra'].resize((new_size,))
-    f['dec'].resize((new_size,))
-
-    # append
-    f['ra'][old_size:new_size] = ra
-    f['dec'][old_size:new_size] = dec
+    for field, values in (('ra', ra), ('dec', dec)):
+        f[field].resize((new_size,))
+        f[field][old_size:new_size] = values
 
 
 def append_shear_to_hdf5(f, ra, dec, gamma1, gamma2, weight, kappa=None):
@@ -118,19 +59,17 @@ def append_shear_to_hdf5(f, ra, dec, gamma1, gamma2, weight, kappa=None):
     old_size = len(f['ra'])
     new_size = old_size + n_new
 
-    # resize datasets
-    f['ra'].resize((new_size,))
-    f['dec'].resize((new_size,))
-    f['g1'].resize((new_size,))
-    f['g2'].resize((new_size,))
-    f['weight'].resize((new_size,))
+    fields_and_values = {
+        'ra': ra,
+        'dec': dec,
+        'g1': gamma1,
+        'g2': gamma2,
+        'weight': weight,
+    }
 
-    # append
-    f['ra'][old_size:new_size] = ra
-    f['dec'][old_size:new_size] = dec
-    f['g1'][old_size:new_size] = gamma1
-    f['g2'][old_size:new_size] = gamma2
-    f['weight'][old_size:new_size] = weight
+    for field, values in fields_and_values.items():
+        f[field].resize((new_size,))
+        f[field][old_size:new_size] = values
 
     if kappa is not None:
         f['kappa'].resize((new_size,))
@@ -192,12 +131,17 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
     for start in range(0, len(galaxy_counts), chunk_size):
         end = min(start + chunk_size, len(galaxy_counts))
         galaxy_counts_chunk = galaxy_counts[start:end]
-
         pix_chunk = np.arange(start, end)
         
+        # avoid wasting time on pixels that are 100%
+        # masked out. We do that by making a low-res mask
+        # that is True if any of the high-res pixels are unmasked,
+        # and then applying it to the chunk of pixels before sampling
+        # the galaxy positions.
         if mask is not None:
+            _, mask_low_res = mask
             # consider only pixels in the chunk
-            mask_chunk = mask[pix_chunk]
+            mask_chunk = mask_low_res[pix_chunk]
             # mask pixels (needs to be of the same len of galaxy_counts_chunkonce masked)
             pix_chunk = pix_chunk[mask_chunk]
             # mask galaxy counts
@@ -209,6 +153,18 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
             continue
 
         theta, phi = hx.randang(nside, ipix=pixels)
+
+        # cut to objects within high-res mask
+        # hopefully not too much slower.
+        # we could make things faster if needed
+        if mask is not None:
+            mask_high_res, _ = mask
+            pix_at_mask_res = hp.ang2pix(mask_nside, theta, phi)
+            mask_values = mask_high_res[pix_at_mask_res]
+            theta = theta[mask_values]
+            phi = phi[mask_values]
+
+
         ra = np.degrees(phi)
         dec = 90. - np.degrees(theta)
 
@@ -308,7 +264,7 @@ def write_shear_catalogue_from_dg_catalogue(dg_catalogue, gamma1_map, gamma2_map
         fin.close()
 
 
-def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kappa=False, path_to_files=''):
+def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kappa=False, path_to_files=''):
     '''
     Convert density and convergence maps into galaxy catalogues using Poisson sampling.
     Parameters
@@ -327,35 +283,42 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
     path_to_files : str, optional
         Base path to the input maps and output catalogues.
     '''
+    f = h5py.File(cosmogrid_filename, 'r')
 
-    dg_cat_maglim_hd5  = initialize_catalogue(path_to_files + filenames['lens'])
-    dg_cat_metacal_hd5 = initialize_catalogue(path_to_files + 'dg_metacal_catalogue.hdf5',)
-    gamma_cat_h5 = initialize_shear_catalogue(path_to_files + filenames['source'], include_kappa)
+    dg_cat_maglim_hd5  = initialize_catalogue(f"{path_to_files}{filenames['lens']}")
+    dg_cat_metacal_hd5 = initialize_catalogue(f"{path_to_files}dg_metacal_catalogue.hdf5",)
+    gamma_cat_h5 = initialize_shear_catalogue(f"{path_to_files}{filenames['source']}", include_kappa)
 
     # Load overdensity maps from CosmoGrid
-    dg_maglim_map = np.array(f['map']['dg']['maglim'+str(bin_i+1)])
-    dg_metacal_map = np.array(f['map']['dg']['metacal'+str(bin_i+1)])
+    dg_maps = {
+        'maglim': np.array(f['map']['dg'][f"maglim{bin_i + 1}"]),
+        'metacal': np.array(f['map']['dg'][f"metacal{bin_i + 1}"]),
+    }
 
-    dg_maglim_map = hp.ud_grade(dg_maglim_map, nside_out=resolution, order_in='RING', order_out='RING')
-    dg_metacal_map = hp.ud_grade(dg_metacal_map, nside_out=resolution, order_in='RING', order_out='RING')
+    # Regrade maps to desired resolution (if needed)
+    for key in dg_maps:
+        print(hp.npix2nside(len(dg_maps[key])))
+        dg_maps[key] = hp.ud_grade(dg_maps[key], nside_out=resolution, order_in='RING', order_out='RING')
 
     # Make lens and source density catalogue (and write it on hdf5 file)
     print('Making galaxy catalogues...')
-    write_dg_catalogue_from_map(delta_g=dg_maglim_map,
-                                number_density=n_g_maglim[bin_i],
-                                mask=mask,
-                                h5filename=dg_cat_maglim_hd5)
-    write_dg_catalogue_from_map(delta_g=dg_metacal_map,
-                                number_density=n_g_metacal[bin_i],
-                                mask=mask,
-                                h5filename=dg_cat_metacal_hd5)
+    catalogue_inputs = [
+        (dg_maps['maglim'], n_g_maglim[bin_i], dg_cat_maglim_hd5),
+        (dg_maps['metacal'], n_g_metacal[bin_i], dg_cat_metacal_hd5),
+    ]
+    for delta_g, number_density, filename in catalogue_inputs:
+        write_dg_catalogue_from_map(delta_g=delta_g,
+                                    number_density=number_density,
+                                    mask=mask,
+                                    h5filename=filename)
 
     # Delete maps (free up memeory)
-    del dg_maglim_map, dg_metacal_map
+    del dg_maps
     gc.collect()
+    print("Making shear catalogue...")
 
     # Load convergence maps from CosmoGrid
-    m = f['map']['kg']['metacal'+str(bin_i+1)][:]
+    m = f['map']['kg'][f"metacal{bin_i + 1}"][:]
     kappa_metacal_map = m - np.mean(m)
     kappa_metacal_map = hp.ud_grade(kappa_metacal_map, nside_out=resolution, order_in='RING', order_out='RING')
 
@@ -385,36 +348,47 @@ def maps2catalogues(filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kap
     # Free up memory
     del g1, g2, gamma_lm
     gc.collect()
+    f.close()
 
 
 def main():
+    current_dir = "."
+    cosmogrid_filename = f"{current_dir}/data/projected_probes_maps_v11dmb.h5"
+    gold_mask = np.load(f"{current_dir}/des-data/desy3_gold_mask.npy")
+
+    path = f"{current_dir}/ottavia-sim/"
+
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
     nbins = 1
 
     start_time = time.time()
 
-    gold_mask = np.load(current_dir+'/data/desy3_gold_mask.npy')
-    mask = np.zeros(hp.nside2npix(4096))
-    mask[gold_mask] = 1.
-    mask = hp.ud_grade(mask, nside_out=resolution, order_in='RING', order_out='RING')
+    mask = np.zeros(hp.nside2npix(mask_nside), dtype=bool)
+    mask[gold_mask] = True
+    mask_low_res = hp.ud_grade(mask.astype(float), nside_out=resolution, order_in='NEST', order_out='NEST')
     mask = hp.reorder(mask, n2r=True)
-    mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
+    mask_low_res = hp.reorder(mask_low_res, n2r=True)
+    # take any value for low-res mask as we do a secondary cut later 
+    # on the full mask
+    mask_low_res = mask_low_res > 0
+    # mask = hp.ud_grade(mask, nside_out=resolution, order_in='RING', order_out='RING')
+    # mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
     
-    path = current_dir+'/data/catalogues/'
     if not os.path.exists(path):
         os.makedirs(path)
 
     for i in range(nbins):
-        print('Processing bin '+str(i+1)+'/'+str(nbins))
-        filenames = {'lens': 'lens_catalog_'+str(resolution)+'_'+str(i)+'.hdf5',
-                    'source': 'source_catalog_'+str(resolution)+'_'+str(i)+'.hdf5'}
+        print(f'Processing bin {i + 1}/{nbins}')
+        filenames = {'lens': f'lens_catalog_{resolution}_{i}.hdf5',
+                    'source': f'source_catalog_{resolution}_{i}.hdf5'}
         
         maps2catalogues(
+            cosmogrid_filename=cosmogrid_filename,
             filenames=filenames,
             n_g_metacal=n_g_metacal,
             n_g_maglim=n_g_maglim,
-            mask=mask,
+            mask=(mask, mask_low_res),
             bin_i=i,
             include_kappa=True,
             path_to_files=path
