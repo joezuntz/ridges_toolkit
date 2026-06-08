@@ -8,11 +8,11 @@ import time
 
 
 
-resolution = 1024
-mask_nside = 4096
+SIM_NSIDE = 1024
+MASK_NSIDE = 4096
 
 
-def _create_resizable_dataset(group, name, dtype):
+def create_resizable_dataset(group, name, dtype):
     group.create_dataset(
         name,
         shape=(0,),
@@ -29,7 +29,7 @@ def initialize_catalogue(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
         for field in ['ra', 'dec']:
-            _create_resizable_dataset(f, field, np.float64)
+            create_resizable_dataset(f, field, np.float64)
     return filename
 
 def initialize_shear_catalogue(filename, include_kappa=False):
@@ -38,10 +38,10 @@ def initialize_shear_catalogue(filename, include_kappa=False):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
         for field in ['ra', 'dec', 'g1', 'g2']:
-            _create_resizable_dataset(f, field, np.float64)
-        _create_resizable_dataset(f, 'weight', 'i2')
+            create_resizable_dataset(f, field, np.float64)
+        create_resizable_dataset(f, 'weight', 'i2')
         if include_kappa:
-            _create_resizable_dataset(f, 'kappa', np.float64)
+            create_resizable_dataset(f, 'kappa', np.float64)
     return filename
 
 def append_to_hdf5(f, ra, dec):
@@ -159,7 +159,7 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
         # we could make things faster if needed
         if mask is not None:
             mask_high_res, _ = mask
-            pix_at_mask_res = hp.ang2pix(mask_nside, theta, phi)
+            pix_at_mask_res = hp.ang2pix(MASK_NSIDE, theta, phi)
             mask_values = mask_high_res[pix_at_mask_res]
             theta = theta[mask_values]
             phi = phi[mask_values]
@@ -298,7 +298,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     # Regrade maps to desired resolution (if needed)
     for key in dg_maps:
         print(hp.npix2nside(len(dg_maps[key])))
-        dg_maps[key] = hp.ud_grade(dg_maps[key], nside_out=resolution, order_in='RING', order_out='RING')
+        dg_maps[key] = hp.ud_grade(dg_maps[key], nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
 
     # Make lens and source density catalogue (and write it on hdf5 file)
     print('Making galaxy catalogues...')
@@ -320,7 +320,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     # Load convergence maps from CosmoGrid
     m = f['map']['kg'][f"metacal{bin_i + 1}"][:]
     kappa_metacal_map = m - np.mean(m)
-    kappa_metacal_map = hp.ud_grade(kappa_metacal_map, nside_out=resolution, order_in='RING', order_out='RING')
+    kappa_metacal_map = hp.ud_grade(kappa_metacal_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
 
     kappa_lm = hp.sphtfunc.map2alm(kappa_metacal_map)
     lmax = hp.Alm.getlmax(len(kappa_lm))
@@ -332,7 +332,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
 
     # Convert shear lm to shear map
     zeros = np.zeros_like(gamma_lm)
-    g1, g2 = hp.alm2map_spin([gamma_lm, zeros], resolution, lmax=lmax, spin=2) 
+    g1, g2 = hp.alm2map_spin([gamma_lm, zeros], SIM_NSIDE, lmax=lmax, spin=2) 
 
     # Write shear catalogue in an hdf5 file
     print('Making shear catalogue...')
@@ -350,13 +350,22 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     gc.collect()
     f.close()
 
+def load_mask(gold_mask_filename):
+    gold_mask = np.load(gold_mask_filename)
+    mask = np.zeros(hp.nside2npix(MASK_NSIDE), dtype=bool)
+    mask[gold_mask] = True
+    # It's a little faster up/downgrade a NEST map than a RING one
+    # because the NEST pixels are inherently arranged hierarchically.
+    mask_low_res = hp.ud_grade(mask.astype(float), nside_out=SIM_NSIDE, order_in='NEST', order_out='NEST')
+    mask = hp.reorder(mask, n2r=True)
+    mask_low_res = hp.reorder(mask_low_res, n2r=True)
+    # take any value for low-res mask as we do a secondary cut later 
+    # on the full mask
+    mask_low_res = mask_low_res > 0
+    return mask, mask_low_res
 
-def main():
-    current_dir = "."
-    cosmogrid_filename = f"{current_dir}/data/projected_probes_maps_v11dmb.h5"
-    gold_mask = np.load(f"{current_dir}/des-data/desy3_gold_mask.npy")
 
-    path = f"{current_dir}/ottavia-sim/"
+def main(cosmogrid_filename, gold_mask_filename, output_dir):
 
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
@@ -364,24 +373,15 @@ def main():
 
     start_time = time.time()
 
-    mask = np.zeros(hp.nside2npix(mask_nside), dtype=bool)
-    mask[gold_mask] = True
-    mask_low_res = hp.ud_grade(mask.astype(float), nside_out=resolution, order_in='NEST', order_out='NEST')
-    mask = hp.reorder(mask, n2r=True)
-    mask_low_res = hp.reorder(mask_low_res, n2r=True)
-    # take any value for low-res mask as we do a secondary cut later 
-    # on the full mask
-    mask_low_res = mask_low_res > 0
-    # mask = hp.ud_grade(mask, nside_out=resolution, order_in='RING', order_out='RING')
-    # mask = mask > 0.8 # change threshold to be more conservative (keep only pixels with >80% coverage)
-    
-    if not os.path.exists(path):
-        os.makedirs(path)
+    mask, mask_low_res = load_mask(gold_mask_filename)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     for i in range(nbins):
         print(f'Processing bin {i + 1}/{nbins}')
-        filenames = {'lens': f'lens_catalog_{resolution}_{i}.hdf5',
-                    'source': f'source_catalog_{resolution}_{i}.hdf5'}
+        filenames = {'lens': f'lens_catalog_{SIM_NSIDE}_{i}.hdf5',
+                    'source': f'source_catalog_{SIM_NSIDE}_{i}.hdf5'}
         
         maps2catalogues(
             cosmogrid_filename=cosmogrid_filename,
@@ -391,7 +391,7 @@ def main():
             mask=(mask, mask_low_res),
             bin_i=i,
             include_kappa=True,
-            path_to_files=path
+            path_to_files=output_dir
         )    
         print(f'Done with bin {i+1}')
 
@@ -401,4 +401,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    cosmogrid_filename = './data/projected_probes_maps_v11dmb.h5'
+    gold_mask_filename = './data/desy3_gold_mask.npy'
+    output_dir = './data/catalogues/'
+    main(cosmogrid_filename, gold_mask_filename, output_dir)
