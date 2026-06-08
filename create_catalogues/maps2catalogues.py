@@ -311,7 +311,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
                                     mask=mask,
                                     h5filename=filename)
 
-    # Delete maps (free up memeory)
+    # Delete maps (free up memory)
     del dg_maps
     gc.collect()
     print("Making shear catalogue...")
