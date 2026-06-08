@@ -356,7 +356,7 @@ def load_mask(gold_mask_filename):
     mask[gold_mask] = True
     # It's a little faster up/downgrade a NEST map than a RING one
     # because the NEST pixels are inherently arranged hierarchically.
-    mask_low_res = hp.ud_grade(mask.astype(float), nside_out=SIM_NSIDE, order_in='NEST', order_out='NEST')
+    mask_low_res = hp.ud_grade(mask.astype(np.float32), nside_out=SIM_NSIDE, order_in='NEST', order_out='NEST')
     mask = hp.reorder(mask, n2r=True)
     mask_low_res = hp.reorder(mask_low_res, n2r=True)
     # take any value for low-res mask as we do a secondary cut later 
