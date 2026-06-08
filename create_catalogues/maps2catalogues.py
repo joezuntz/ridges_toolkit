@@ -297,7 +297,6 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
 
     # Regrade maps to desired resolution (if needed)
     for key in dg_maps:
-        print(hp.npix2nside(len(dg_maps[key])))
         dg_maps[key] = hp.ud_grade(dg_maps[key], nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
 
     # Make lens and source density catalogue (and write it on hdf5 file)
