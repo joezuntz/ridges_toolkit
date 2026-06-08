@@ -142,7 +142,7 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
             _, mask_low_res = mask
             # consider only pixels in the chunk
             mask_chunk = mask_low_res[pix_chunk]
-            # mask pixels (needs to be of the same len of galaxy_counts_chunkonce masked)
+            # mask pixels (needs to be of the same len of galaxy_counts_chunk once masked)
             pix_chunk = pix_chunk[mask_chunk]
             # mask galaxy counts
             galaxy_counts_chunk = galaxy_counts_chunk[mask_chunk]
