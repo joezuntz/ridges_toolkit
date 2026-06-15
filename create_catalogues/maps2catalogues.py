@@ -112,7 +112,7 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
     # get map of galaxy counts with Poisson distribution
     galaxy_counts = extract_poisson_counts_from_map(delta_g, number_density)
     total_count = galaxy_counts.sum()
-    print("Cat size:", galaxy_counts.sum())
+
     if will_be_gamma:
         initialize_shear_catalogue(h5filename, total_count)
     else:
@@ -163,8 +163,14 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
 
         append_to_hdf5(f, ra, dec, current_size)
         current_size += ra.size
+
+    # because we masked out some pixels the final size
+    # will not be the same as the initial one, so we cut
+    # down the size now
+    for dataset in f.values():
+        dataset.resize((current_size,))
     # print total number of galaxy (after mask)
-    print(f'Total number of galaxies: {len(f["ra"])/1e6:.2f} million')
+    print(f'Total number of galaxies: {current_size/1e6:.2f} million')
     f.close()
 
 
