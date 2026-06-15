@@ -12,68 +12,54 @@ SIM_NSIDE = 1024
 MASK_NSIDE = 4096
 
 
-def create_resizable_dataset(group, name, dtype):
+def create_resizable_dataset(group, name, dtype, max_size):
     group.create_dataset(
         name,
-        shape=(0,),
-        maxshape=(None,),
+        shape=(max_size,),
+        maxshape=(max_size,),
         dtype=dtype,
         chunks=True,
-        compression='gzip',
+        # compression='gzip',
         shuffle=True
     )
 
-def initialize_catalogue(filename):
+def initialize_catalogue(filename, max_size):
     # Delete existing file if it exists
     if os.path.exists(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
         for field in ['ra', 'dec']:
-            create_resizable_dataset(f, field, np.float64)
+            create_resizable_dataset(f, field, np.float64, max_size)
     return filename
 
-def initialize_shear_catalogue(filename, include_kappa=False):
+def initialize_shear_catalogue(filename, max_size):
     # Delete existing file if it exists
     if os.path.exists(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
-        for field in ['ra', 'dec', 'g1', 'g2']:
-            create_resizable_dataset(f, field, np.float64)
-        create_resizable_dataset(f, 'weight', 'i2')
-        if include_kappa:
-            create_resizable_dataset(f, 'kappa', np.float64)
+        for field in ['ra', 'dec', 'g1', 'g2', 'kappa']:
+            create_resizable_dataset(f, field, np.float64, max_size)
+        create_resizable_dataset(f, 'weight', 'i2', max_size)
     return filename
 
-def append_to_hdf5(f, ra, dec):
+def append_to_hdf5(f, ra, dec, n_old):
     n_new = len(ra)
-    old_size = len(f['ra'])
-    new_size = old_size + n_new
+    max_size = f['ra'].size
+    if n_new + n_old > max_size:
+        raise ValueError(f"Joe must have made a mistake estimating the total size: {n_new}, {n_old}, {max_size}")
+    f['ra'][n_old:n_old + n_new] = ra
+    f['dec'][n_old:n_old + n_new] = dec
 
-    for field, values in (('ra', ra), ('dec', dec)):
-        f[field].resize((new_size,))
-        f[field][old_size:new_size] = values
 
+def append_shear_to_hdf5(f, gamma1, gamma2, weight, n_old, kappa=None):
+    n_new = len(gamma1)
 
-def append_shear_to_hdf5(f, ra, dec, gamma1, gamma2, weight, kappa=None):
-    n_new = len(ra)
-    old_size = len(f['ra'])
-    new_size = old_size + n_new
-
-    fields_and_values = {
-        'ra': ra,
-        'dec': dec,
-        'g1': gamma1,
-        'g2': gamma2,
-        'weight': weight,
-    }
-
-    for field, values in fields_and_values.items():
-        f[field].resize((new_size,))
-        f[field][old_size:new_size] = values
+    f["g1"][n_old:n_old+n_new] = gamma1
+    f["g2"][n_old:n_old+n_new] = gamma2
+    f["weight"][n_old:n_old+n_new] = weight
 
     if kappa is not None:
-        f['kappa'].resize((new_size,))
-        f['kappa'][old_size:new_size] = kappa
+        f["kappa"][n_old:n_old+n_new] = kappa
 
 
 def extract_poisson_counts_from_map(map, n_density):
@@ -103,7 +89,7 @@ def extract_poisson_counts_from_map(map, n_density):
     return gal_counts
 
 
-def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, chunk_size=10_000):
+def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, chunk_size=10_000, will_be_gamma=False):
     '''
     Write galaxy catalogue from density maps using Poisson sampling.
 
@@ -118,15 +104,22 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
     chunk_size : int, optional
         Number of pixels to process in each chunk (default is 10,000)
     '''
-    
+
     # recenter map
     delta_g = delta_g - np.mean(delta_g)
 
     nside = hp.get_nside(delta_g)
     # get map of galaxy counts with Poisson distribution
     galaxy_counts = extract_poisson_counts_from_map(delta_g, number_density)
+    total_count = galaxy_counts.sum()
+    print("Cat size:", galaxy_counts.sum())
+    if will_be_gamma:
+        initialize_shear_catalogue(h5filename, total_count)
+    else:
+        initialize_catalogue(h5filename, total_count)
 
     f = h5py.File(h5filename, 'a')
+    current_size = 0
 
     for start in range(0, len(galaxy_counts), chunk_size):
         end = min(start + chunk_size, len(galaxy_counts))
@@ -168,7 +161,8 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
         ra = np.degrees(phi)
         dec = 90. - np.degrees(theta)
 
-        append_to_hdf5(f, ra, dec)
+        append_to_hdf5(f, ra, dec, current_size)
+        current_size += ra.size
     # print total number of galaxy (after mask)
     print(f'Total number of galaxies: {len(f["ra"])/1e6:.2f} million')
     f.close()
@@ -204,7 +198,7 @@ def kappa2gamma_lm_map(kappa_lm, lmax):
     return gamma_lm
 
 
-def write_shear_catalogue_from_dg_catalogue(dg_catalogue, gamma1_map, gamma2_map, h5filename='new_gamma_catalogue.h5', chunk_size=200_000, kappa=None):
+def write_shear_catalogue_from_dg_catalogue(gamma1_map, gamma2_map, h5filename, chunk_size=200_000, kappa=None):
     '''
     Build a shear-annotated catalogue from a density-galaxy catalogue.
 
@@ -225,18 +219,17 @@ def write_shear_catalogue_from_dg_catalogue(dg_catalogue, gamma1_map, gamma2_map
         The output h5filename.
     '''
 
-    with h5py.File(dg_catalogue, 'r') as fin, \
-         h5py.File(h5filename, 'a') as fout:
-
-        N = len(fin['ra'])
+    with h5py.File(h5filename, 'r+') as f:
+        N = len(f['ra'])
+        current_size = 0
 
         for start in range(0, N, chunk_size):
 
             end = min(start + chunk_size, N)
 
             # sequential reads
-            ra_chunk = fin['ra'][start:end]
-            dec_chunk = fin['dec'][start:end]
+            ra_chunk = f['ra'][start:end]
+            dec_chunk = f['dec'][start:end]
             
             theta = np.radians(90 - dec_chunk)
             phi = np.radians(ra_chunk)
@@ -258,13 +251,11 @@ def write_shear_catalogue_from_dg_catalogue(dg_catalogue, gamma1_map, gamma2_map
                 kappa_chunk = kappa[pix]
             
             # write on hdf5 using global index
-            append_shear_to_hdf5(fout, ra_chunk, dec_chunk, gamma1_chunk, gamma2_chunk, w, kappa_chunk)
-
-        fout.close()
-        fin.close()
+            append_shear_to_hdf5(f, gamma1_chunk, gamma2_chunk, w, current_size, kappa_chunk)
+            current_size += gamma1_chunk.size
 
 
-def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask, bin_i, include_kappa=False, path_to_files=''):
+def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask, bin_i, path_to_files=''):
     '''
     Convert density and convergence maps into galaxy catalogues using Poisson sampling.
     Parameters
@@ -278,43 +269,50 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
         HEALPix mask to apply to the maps (same nside as the maps).
     bin_i : int
         Index of the redshift bin to process (0-based).
-    include_kappa : bool, optional
-        Whether to include kappa values in the shear catalogue (default is False).
     path_to_files : str, optional
         Base path to the input maps and output catalogues.
     '''
     f = h5py.File(cosmogrid_filename, 'r')
 
-    dg_cat_maglim_hd5  = initialize_catalogue(f"{path_to_files}{filenames['lens']}")
-    dg_cat_metacal_hd5 = initialize_catalogue(f"{path_to_files}dg_metacal_catalogue.hdf5",)
-    gamma_cat_h5 = initialize_shear_catalogue(f"{path_to_files}{filenames['source']}", include_kappa)
-
     # Load overdensity maps from CosmoGrid
-    dg_maps = {
-        'maglim': np.array(f['map']['dg'][f"maglim{bin_i + 1}"]),
-        'metacal': np.array(f['map']['dg'][f"metacal{bin_i + 1}"]),
-    }
+    maglim_dg_map = f['map']['dg'][f"maglim{bin_i + 1}"][:]
 
     # Regrade maps to desired resolution (if needed)
-    for key in dg_maps:
-        dg_maps[key] = hp.ud_grade(dg_maps[key], nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
+    maglim_dg_map = hp.ud_grade(maglim_dg_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
 
-    # Make lens and source density catalogue (and write it on hdf5 file)
-    print('Making galaxy catalogues...')
-    catalogue_inputs = [
-        (dg_maps['maglim'], n_g_maglim[bin_i], dg_cat_maglim_hd5),
-        (dg_maps['metacal'], n_g_metacal[bin_i], dg_cat_metacal_hd5),
-    ]
-    for delta_g, number_density, filename in catalogue_inputs:
-        write_dg_catalogue_from_map(delta_g=delta_g,
-                                    number_density=number_density,
-                                    mask=mask,
-                                    h5filename=filename)
+    dg_cat_maglim_hd5 = f"{path_to_files}{filenames['lens']}"
+
+    # Make the lens density catalogue.
+    # We don't need a separate density catalogue for the source sample
+    # because the gamma map below already contains that information
+    # and it would just be a duplicate.
+    print('Making maglim catalogue...')
+    write_dg_catalogue_from_map(delta_g=maglim_dg_map,
+                                number_density=n_g_maglim[bin_i],
+                                mask=mask,
+                                h5filename=dg_cat_maglim_hd5
+                                )
 
     # Delete maps (free up memory)
-    del dg_maps
+    del maglim_dg_map
     gc.collect()
     print("Making shear catalogue...")
+
+    metacal_dg_map = f['map']['dg'][f"metacal{bin_i + 1}"][:]
+    metacal_dg_map = hp.ud_grade(metacal_dg_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
+
+
+    gamma_cat_h5 = f"{path_to_files}{filenames['source']}"
+
+    # first write the RA/Dec parts of the shear catalog
+    write_dg_catalogue_from_map(delta_g=metacal_dg_map,
+                                number_density=n_g_metacal[bin_i],
+                                mask=mask,
+                                h5filename=gamma_cat_h5,
+                                will_be_gamma=True)
+    
+    del metacal_dg_map
+    gc.collect()
 
     # Load convergence maps from CosmoGrid
     m = f['map']['kg'][f"metacal{bin_i + 1}"][:]
@@ -335,8 +333,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
 
     # Write shear catalogue in an hdf5 file
     print('Making shear catalogue...')
-    write_shear_catalogue_from_dg_catalogue(dg_catalogue=dg_cat_metacal_hd5, 
-                                            gamma1_map=g1, 
+    write_shear_catalogue_from_dg_catalogue(gamma1_map=g1, 
                                             gamma2_map=g2,
                                             h5filename=gamma_cat_h5, 
                                             kappa=kappa_metacal_map)
@@ -389,7 +386,6 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir):
             n_g_maglim=n_g_maglim,
             mask=(mask, mask_low_res),
             bin_i=i,
-            include_kappa=True,
             path_to_files=output_dir
         )    
         print(f'Done with bin {i+1}')
