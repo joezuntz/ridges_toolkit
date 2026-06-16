@@ -1,13 +1,7 @@
-import numpy as np
-import os
-import pickle
-from sklearn.neighbors import BallTree
 from .utils import haversine_distance
-
 import numpy as np
 import healpy as hp
 import numba
-import tqdm
 
 # think about jax-healpy for this!
 class HealpixTree:
@@ -152,12 +146,17 @@ def query_tree(tree: HealpixTree, points, radius):
 
     Returns:
     --------
-    indices : numpy.ndarray
+    packed_indices : numpy.ndarray
         An array of indices of the nearest neighbors for each input point.
+        The shape is (npoint, max_count). Only the start of each array is
+        valid.
 
-    distances : numpy.ndarray
+    counts : numpy.ndarry
+        The number of valid indices for each point.
+
+    packed_distances : numpy.ndarray
         An array of distances to the nearest neighbors for
-        each input point.
+        each input point. Also of shape (npoint, max_count)
     """
     output = []
     output_distances = []
@@ -171,13 +170,13 @@ def query_tree(tree: HealpixTree, points, radius):
         output_distances.append(distances)
     
     max_output = np.max(counts)
-    packed_output = np.zeros((npoint, max_output), dtype=np.int64)
+    packed_indices = np.zeros((npoint, max_output), dtype=np.int64)
     packed_distances = np.zeros((npoint, max_output), dtype=np.float64)
     for i, (indices, distances) in enumerate(zip(output, output_distances)):
-        packed_output[i, :len(indices)] = indices
+        packed_indices[i, :len(indices)] = indices
         packed_distances[i, :len(distances)] = distances
 
-    return packed_output, counts, packed_distances
+    return packed_indices, counts, packed_distances
 
 
 def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
