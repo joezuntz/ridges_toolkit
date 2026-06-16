@@ -361,7 +361,7 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
 
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
-    nbins = 1
+    nbins = 4
 
     start_time = time.time()
 
@@ -406,7 +406,12 @@ def run_on_full_cosmogrid():
     # we just find all of their names instead of using a range.
     cosmo_dirs = sorted(glob.glob(f"cosmo_*", root_dir=base_dir))
 
+    # Whether to log the failures, and
+    # how many cosmologies to do
     log_failures = False
+    max_n_cosmo = 10
+
+    cosmo_dirs = cosmo_dirs[:max_n_cosmo]
 
     # once the main code is working we will check for occasional failures
     # and save them to this file. We have to do one file per rank
