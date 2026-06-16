@@ -1,7 +1,6 @@
 import os
 import sys
 from timeit import default_timer as timer
-from .bandwidth import estimate_bandwidth
 import numpy as np
 from .checkpoints import checkpoint, load_ridge_state
 from .tree import make_tree, cut_points_with_tree
@@ -21,7 +20,6 @@ def find_filaments(
     min_checkpoint_gap=30,
     resume=False,
     seed=None,
-    tree_file=None,
     comm=None,
     weights=None,
 ):
@@ -92,11 +90,6 @@ def find_filaments(
         If provided, sets the random seed for reproducibility.
         Required if using checkpointing as otherwise the resumed
         run will not match the original run.
-
-    tree_file: str, defaults to None
-        If provided, the file where the BallTree will be saved or loaded from.
-        If the file exists, it will be loaded; otherwise, a new tree will be created.
-        This is mainly useful when testing.
 
     comm: mpi4py.MPI.Comm, defaults to None
         If provided, the MPI communicator to use for parallel processing.
@@ -300,7 +293,6 @@ def parameter_check(**p):
     checkpoint_dir = p["checkpoint_dir"]
     resume = p["resume"]
     seed = p["seed"]
-    tree_file = p["tree_file"]
     comm = p["comm"]
 
     # Check whether two-dimensional coordinates are provided
@@ -344,10 +336,6 @@ def parameter_check(**p):
     # Check whether seed is an integer or None
     if seed is not None and not isinstance(seed, int):
         raise ValueError("ERROR: seed must be an integer or None")
-
-    # Check whether tree_file is a string or None
-    if tree_file is not None and not isinstance(tree_file, str):
-        raise ValueError("ERROR: tree_file must be a string or None")
 
     # Check whether comm is None or an MPI communicator
     if comm is not None and not hasattr(comm, "rank"):
