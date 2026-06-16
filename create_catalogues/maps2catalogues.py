@@ -5,8 +5,8 @@ import numpy as np
 import os 
 import gc
 import time
-
-
+import glob
+import traceback
 
 SIM_NSIDE = 1024
 MASK_NSIDE = 4096
@@ -357,7 +357,7 @@ def load_mask(gold_mask_filename):
     return mask, mask_low_res
 
 
-def main(cosmogrid_filename, gold_mask_filename, output_dir):
+def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
 
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
@@ -372,8 +372,8 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir):
 
     for i in range(nbins):
         print(f'Processing bin {i + 1}/{nbins}')
-        filenames = {'lens': f'lens_catalog_{SIM_NSIDE}_{i}.hdf5',
-                    'source': f'source_catalog_{SIM_NSIDE}_{i}.hdf5'}
+        filenames = {'lens': f'{prefix}lens_catalog_{SIM_NSIDE}_{i}.hdf5',
+                    'source': f'{prefix}source_catalog_{SIM_NSIDE}_{i}.hdf5'}
         
         maps2catalogues(
             cosmogrid_filename=cosmogrid_filename,
@@ -389,6 +389,56 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir):
     print('-------------------------------')
     end_time = time.time()
     print(f'Total time taken: {(end_time - start_time)/60:.2f} minutes')
+
+def run_on_full_cosmogrid():
+    from mpi4py.MPI import COMM_WORLD as comm
+    rank = comm.rank
+    size = comm.size
+
+    # Basic input and output directories
+    base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/grid"
+    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
+    gold_mask_filename = f"{output_base_dir}/desy3_gold_mask.npy"
+
+    # Each different cosmology has its own directory.
+    # They are numbered but some numbers are missing, so
+    # we just find all of their names instead of using a range.
+    cosmo_dirs = sorted(glob.glob(f"cosmo_*"), root_dir=base_dir)
+
+    # once the main code is working we will check for occasional failures
+    # and save them to this file. We have to do one file per rank
+    # otherwise they will all get mixed up. I'll leave this commented
+    # out for now.
+    # failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
+    # failure_log = open(failure_log_filename)
+
+    for permutation in range(20):
+        perm_dir = f"perm_{permutation:04d}"
+
+        for i, cosmo_dir in enumerate(cosmo_dirs):
+            if i % size != rank:
+                continue
+
+            # construct all the file paths we need
+            cosmogrid_file = f"{base_dir}/{cosmo_dir}/{perm_dir}/projected_probes_maps_v11dmb.h5"
+            output_dir = f"{output_base_dir}/{cosmo_dir}"
+            # we don't want to have too many directories so we collect
+            # the different permutations together in the same directory
+            prefix = perm_dir + "_"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Try running the main function, but if something goes wrong, log it to the file
+            try:
+                main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix)
+            except Exception as error:
+                # While testing, let errors cause a crash as normal.
+                # once things are working we can catch any occasional errors
+                raise
+                failure_log.write("\n\n" + str(error) + "\n")
+                failure_log.write(f"perm={i} cosmo_dir={cosmo_dir}\n")
+                failure_log.write(traceback.format_exc())
+    failure_log.close()
+
 
 
 if __name__ == "__main__":
