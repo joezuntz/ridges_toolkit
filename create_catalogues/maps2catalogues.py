@@ -17,7 +17,6 @@ def log(*args, **kwargs):
     if VERBOSE:
         print(*args, **kwargs)
 
-
 def create_resizable_dataset(group, name, dtype, max_size):
     group.create_dataset(
         name,
