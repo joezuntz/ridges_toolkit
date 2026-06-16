@@ -53,11 +53,11 @@ class HealpixTree:
     def __getstate__(self):
         state = {
             "nside": self.nside,
-            "theta": self.theta,
-            "phi": self.phi,
-            "pix": self.pix,
-            "pixels_to_indices": dict(self.pixels_to_indices),  # Convert to regular dict for pickling
-            "max_npix": self.max_npix
+            "theta": getattr(self, "theta", None),
+            "phi": getattr(self, "phi", None),
+            "pix": getattr(self, "pix", None),
+            "pixels_to_indices": dict(getattr(self, "pixels_to_indices", {})),
+            "max_npix": getattr(self, "max_npix", 0),
         }
         return state
     
