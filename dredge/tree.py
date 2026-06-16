@@ -142,7 +142,7 @@ def make_tree(coordinates, tree_nside):
     return tree
 
 
-def query_tree(tree: BallTree, points, radius):
+def query_tree(tree: HealpixTree, points, radius):
     """
     Query a HealpixTree to find the points within
     a specified radius of the input points.
