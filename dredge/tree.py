@@ -189,8 +189,8 @@ def cut_points_with_tree(ridges, tree, bandwidth, threshold=4):
     -----------
     ridges : numpy.ndarray
         An array of points (e.g., coordinates) to be filtered, in [dec, ra]
-    tree : scipy.spatial.cKDTree
-        A KD-tree object used to efficiently query the nearest neighbors of points in `ridges`.
+    tree : HealpixTree
+        A healpix tree-like object used to efficiently query the nearest neighbors of points in `ridges`.
     bandwidth : float
         The bandwidth value used to calculate the angular distance threshold.
     threshold : float, optional
