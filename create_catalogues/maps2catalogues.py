@@ -425,7 +425,7 @@ def run_on_full_cosmogrid():
 
             # construct all the file paths we need
             cosmogrid_file = f"{base_dir}/{cosmo_dir}/{perm_dir}/projected_probes_maps_v11dmb.h5"
-            output_dir = f"{output_base_dir}/{cosmo_dir}"
+            output_dir = f"{output_base_dir}/{cosmo_dir}/"
             os.makedirs(output_dir, exist_ok=True)
 
             marker_file = os.path.join(output_dir, f"complete.{permutation}")
