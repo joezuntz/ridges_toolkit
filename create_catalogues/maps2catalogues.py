@@ -404,7 +404,7 @@ def run_on_full_cosmogrid():
     # Each different cosmology has its own directory.
     # They are numbered but some numbers are missing, so
     # we just find all of their names instead of using a range.
-    cosmo_dirs = sorted(glob.glob(f"cosmo_*"), root_dir=base_dir)
+    cosmo_dirs = sorted(glob.glob(f"cosmo_*", root_dir=base_dir))
 
     log_failures = False
 
