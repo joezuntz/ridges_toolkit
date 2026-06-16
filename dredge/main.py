@@ -154,9 +154,8 @@ def find_filaments(
     my_num_ridge_points = num_ridge_points // comm_size
     # Create an evenly-spaced mesh in for the provided coordinates
     ridges = mesh_generation(coordinates, my_num_ridge_points, [seed, rank])
-    # remove any ridges that are more than mesh_threshold bandwidths from any point
-    # We do the cutting here on the root process so that each process actually does get the
-    # same number of points to work with.
+# remove any ridges that are more than mesh_threshold bandwidths from any point
+# This cut runs independently on each rank (after broadcasting the tree).
     if is_root:
         print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
     ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
