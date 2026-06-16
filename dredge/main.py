@@ -141,7 +141,7 @@ def find_filaments(
     # every process is using the exact same one.
     if is_root:
         # Make the ball tree to speed up finding nearby points
-        print("Generated mesh.  Making tree.")
+        print("Making tree.")
         tree = make_tree(coordinates, tree_nside)
     else:
         tree = None
@@ -153,7 +153,8 @@ def find_filaments(
 
     my_num_ridge_points = num_ridge_points // comm_size
     # Create an evenly-spaced mesh in for the provided coordinates
-    ridges = mesh_generation(coordinates, my_num_ridge_points, [seed, rank])
+    seed_for_rank = None if seed is None else (seed, rank)
+    ridges = mesh_generation(coordinates, my_num_ridge_points, seed_for_rank)
 # remove any ridges that are more than mesh_threshold bandwidths from any point
 # This cut runs independently on each rank (after broadcasting the tree).
     if is_root:
