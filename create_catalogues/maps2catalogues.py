@@ -37,7 +37,7 @@ def initialize_shear_catalogue(filename, max_size):
     if os.path.exists(filename):
         os.remove(filename)
     with h5py.File(filename, 'w') as f:
-        for field in ['ra', 'dec', 'g1', 'g2', 'kappa']:
+        for field in ['ra', 'dec', 'g1', 'g2']:
             create_resizable_dataset(f, field, np.float64, max_size)
         create_resizable_dataset(f, 'weight', 'i2', max_size)
     return filename
@@ -51,15 +51,12 @@ def append_to_hdf5(f, ra, dec, n_old):
     f['dec'][n_old:n_old + n_new] = dec
 
 
-def append_shear_to_hdf5(f, gamma1, gamma2, weight, n_old, kappa=None):
+def append_shear_to_hdf5(f, gamma1, gamma2, weight, n_old):
     n_new = len(gamma1)
 
     f["g1"][n_old:n_old+n_new] = gamma1
     f["g2"][n_old:n_old+n_new] = gamma2
     f["weight"][n_old:n_old+n_new] = weight
-
-    if kappa is not None:
-        f["kappa"][n_old:n_old+n_new] = kappa
 
 
 def extract_poisson_counts_from_map(map, n_density):
@@ -249,15 +246,8 @@ def write_shear_catalogue_from_dg_catalogue(gamma1_map, gamma2_map, h5filename, 
             # redshift tag for this chunk
             w = np.full(n, 1.)
             
-            # interpolate kappa if provided
-            kappa_chunk = None
-            pix = hp.ang2pix(hp.get_nside(gamma1_map), theta, phi)
-            if kappa is not None:
-                # get kappa values at galaxy positions (no interpolation needed, take directly from kappa)
-                kappa_chunk = kappa[pix]
-            
             # write on hdf5 using global index
-            append_shear_to_hdf5(f, gamma1_chunk, gamma2_chunk, w, current_size, kappa_chunk)
+            append_shear_to_hdf5(f, gamma1_chunk, gamma2_chunk, w, current_size)
             current_size += gamma1_chunk.size
 
 
@@ -332,6 +322,8 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     print('Getting shear from convergence...')
     gamma_lm = kappa2gamma_lm_map(kappa_lm=kappa_lm, lmax=lmax)
 
+    # Delete convergence maps
+    del kappa_metacal_map, kappa_lm
 
     # Convert shear lm to shear map
     zeros = np.zeros_like(gamma_lm)
@@ -342,9 +334,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     write_shear_catalogue_from_dg_catalogue(gamma1_map=g1, 
                                             gamma2_map=g2,
                                             h5filename=gamma_cat_h5, 
-                                            kappa=kappa_metacal_map)
-    # Delete convergence maps
-    del kappa_metacal_map, kappa_lm
+                                            )
     gc.collect()
 
     # Free up memory
