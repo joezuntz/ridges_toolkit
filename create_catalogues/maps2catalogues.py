@@ -405,12 +405,15 @@ def run_on_full_cosmogrid():
     # we just find all of their names instead of using a range.
     cosmo_dirs = sorted(glob.glob(f"cosmo_*"), root_dir=base_dir)
 
+    log_failures = False
+
     # once the main code is working we will check for occasional failures
     # and save them to this file. We have to do one file per rank
     # otherwise they will all get mixed up. I'll leave this commented
     # out for now.
-    # failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
-    # failure_log = open(failure_log_filename)
+    if log_failures:
+        failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
+        failure_log = open(failure_log_filename)
 
     for permutation in range(20):
         perm_dir = f"perm_{permutation:04d}"
@@ -433,11 +436,14 @@ def run_on_full_cosmogrid():
             except Exception as error:
                 # While testing, let errors cause a crash as normal.
                 # once things are working we can catch any occasional errors
-                raise
-                failure_log.write("\n\n" + str(error) + "\n")
-                failure_log.write(f"perm={i} cosmo_dir={cosmo_dir}\n")
-                failure_log.write(traceback.format_exc())
-    failure_log.close()
+                if log_failures:
+                    failure_log.write("\n\n" + str(error) + "\n")
+                    failure_log.write(f"perm={i} cosmo_dir={cosmo_dir}\n")
+                    failure_log.write(traceback.format_exc())
+                else:
+                    raise
+    if log_failures:
+        failure_log.close()
 
 
 
