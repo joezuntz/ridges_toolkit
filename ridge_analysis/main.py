@@ -97,6 +97,7 @@ def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmen
         # filament_segments is a list of graphs.
         print("Clustering segments with DBSCAN")
         filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
+        n_filament = len(filament_labels)
         #filament labels is now a list of indices.
 
         final_nridge = sum(len(seg) for seg in filament_labels)
@@ -113,19 +114,15 @@ def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmen
             ridge_id_out[i : i + chunk_n] = label
             i += chunk_n
 
+    if rank > 0 and not segmentation_config.do_spline:
+        return
+
     if size > 1 and segmentation_config.do_spline:
         # Broadcast the results to all ranks for the optional spline interpolation step.
-        if rank == 0:
-            print(f"Broadcasting {len(ra_out)} ridge points to {size} ranks for interpolation")
-            n_filament =  len(filament_labels)
-        else:
-            print("Waiting to receive ridge points for interpolation")
         ra_out = comm.bcast(ra_out if rank == 0 else None, root=0)
         dec_out = comm.bcast(dec_out if rank == 0 else None, root=0)
         ridge_id_out = comm.bcast(ridge_id_out if rank == 0 else None, root=0)
         n_filament = comm.bcast(n_filament if rank == 0 else None, root=0)
-    else:
-        n_filament =  len(filament_labels)
 
 
     # Now create the catalog object that is going into interpolation
