@@ -414,7 +414,7 @@ def run_on_full_cosmogrid():
     # out for now.
     if log_failures:
         failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
-        failure_log = open(failure_log_filename)
+        failure_log = open(failure_log_filename, "w")
 
     for permutation in range(20):
         perm_dir = f"perm_{permutation:04d}"
@@ -441,7 +441,7 @@ def run_on_full_cosmogrid():
                 main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix)
                 # when all has completed, add a marker file to the output dir
                 # so we know this permutation is done
-                open(marker_file).close()
+                open(marker_file, "w").close()
 
             except Exception as error:
                 # While testing, let errors cause a crash as normal.
