@@ -1,15 +1,15 @@
 global:
     catalog_dir: ./example
-    ridge_dir: ./example-tree
-    segment_dir: ./example-tree
+    ridge_dir: ./example
+    segment_dir: ./example
     plot_dir: ./example
     shear_dir: ./example-tree
     lens_bins: [0]
     source_bins: [0]
 
 # You can find complete listings of the parameters
-# available for each of these sections in the
-# config.py files in the ridge_sims and ridge_analysis directories.
+# available for each of these sections in the
+# config.py files in the ridge_sims and ridge_analysis directories.
 
 simulate:
     dx: 300.0
