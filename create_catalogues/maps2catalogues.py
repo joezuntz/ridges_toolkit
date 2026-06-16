@@ -7,9 +7,15 @@ import gc
 import time
 import glob
 import traceback
+from timeit import default_timer as timer
 
 SIM_NSIDE = 1024
 MASK_NSIDE = 4096
+VERBOSE = True
+
+def log(*args, **kwargs):
+    if VERBOSE:
+        print(*args, **kwargs)
 
 
 def create_resizable_dataset(group, name, dtype, max_size):
@@ -167,7 +173,7 @@ def write_dg_catalogue_from_map(delta_g, number_density, h5filename, mask=None, 
     for dataset in f.values():
         dataset.resize((current_size,))
     # print total number of galaxy (after mask)
-    print(f'Total number of galaxies: {current_size/1e6:.2f} million')
+    log(f'Total number of galaxies: {current_size/1e6:.2f} million')
     f.close()
 
 
@@ -282,7 +288,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     # We don't need a separate density catalogue for the source sample
     # because the gamma map below already contains that information
     # and it would just be a duplicate.
-    print('Making maglim catalogue...')
+    log('Making maglim catalogue...')
     write_dg_catalogue_from_map(delta_g=maglim_dg_map,
                                 number_density=n_g_maglim[bin_i],
                                 mask=mask,
@@ -292,7 +298,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     # Delete maps (free up memory)
     del maglim_dg_map
     gc.collect()
-    print("Making shear catalogue...")
+    log("Making shear catalogue...")
 
     metacal_dg_map = f['map']['dg'][f"metacal{bin_i + 1}"][:]
     metacal_dg_map = hp.ud_grade(metacal_dg_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
@@ -319,7 +325,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     lmax = hp.Alm.getlmax(len(kappa_lm))
 
     # Convert convergence to shear (in Harmonic space)
-    print('Getting shear from convergence...')
+    log('Getting shear from convergence...')
     gamma_lm = kappa2gamma_lm_map(kappa_lm=kappa_lm, lmax=lmax)
 
     # Delete convergence maps
@@ -330,7 +336,7 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     g1, g2 = hp.alm2map_spin([gamma_lm, zeros], SIM_NSIDE, lmax=lmax, spin=2) 
 
     # Write shear catalogue in an hdf5 file
-    print('Making shear catalogue...')
+    log('Making shear catalogue...')
     write_shear_catalogue_from_dg_catalogue(gamma1_map=g1, 
                                             gamma2_map=g2,
                                             h5filename=gamma_cat_h5, 
@@ -371,7 +377,7 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
         os.makedirs(output_dir)
 
     for i in range(nbins):
-        print(f'Processing bin {i + 1}/{nbins}')
+        log(f'Processing bin {i + 1}/{nbins}')
         filenames = {'lens': f'{prefix}lens_catalog_{SIM_NSIDE}_{i}.hdf5',
                     'source': f'{prefix}source_catalog_{SIM_NSIDE}_{i}.hdf5'}
         
@@ -384,18 +390,23 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
             bin_i=i,
             path_to_files=output_dir
         )    
-        print(f'Done with bin {i+1}')
+        log(f'Done with bin {i+1}')
 
-    print('-------------------------------')
+    log('-------------------------------')
     end_time = time.time()
-    print(f'Total time taken: {(end_time - start_time)/60:.2f} minutes')
+    log(f'Total time taken: {(end_time - start_time)/60:.2f} minutes')
 
 def run_on_full_cosmogrid():
+    # suppress printing in the rest of the code
+    global VERBOSE
+    VERBOSE = False
+
+    # set up MPI processors
     from mpi4py.MPI import COMM_WORLD as comm
     rank = comm.rank
     size = comm.size
 
-    # Basic input and output directories
+    # Basic input and output directories
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/grid"
     output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
     gold_mask_filename = f"{output_base_dir}/desy3_gold_mask.npy"
@@ -409,7 +420,7 @@ def run_on_full_cosmogrid():
     # Whether to log the failures, and
     # how many cosmologies to do
     log_failures = False
-    max_n_cosmo = 10
+    max_n_cosmo = 64
 
     cosmo_dirs = cosmo_dirs[:max_n_cosmo]
 
@@ -436,7 +447,10 @@ def run_on_full_cosmogrid():
             marker_file = os.path.join(output_dir, f"complete.{permutation}")
             # skip if the completion marker is already done.
             if os.path.exists(marker_file):
+                print(f"Rank {rank} skipping {cosmo_dir} permutation {permutation}")
                 continue
+            print(f"Rank {rank} running {cosmo_dir} permutation {permutation}")
+            t0 = timer()
             # we don't want to have too many directories so we collect
             # the different permutations together in the same directory
             prefix = perm_dir + "_"
@@ -447,10 +461,14 @@ def run_on_full_cosmogrid():
                 # when all has completed, add a marker file to the output dir
                 # so we know this permutation is done
                 open(marker_file, "w").close()
+                t1 = timer()
+                print(f"Rank {rank} Completed {cosmo_dir} permutation {permutation} in {t1-t0:.1f} seconds")
 
             except Exception as error:
                 # While testing, let errors cause a crash as normal.
                 # once things are working we can catch any occasional errors
+                t1 = timer()
+                print(f"Rank {rank} ERROR {cosmo_dir} permutation {permutation} afer {t1-t0:.1f} seconds")
                 if log_failures:
                     failure_log.write("\n\n" + str(error) + "\n")
                     failure_log.write(f"perm={i} cosmo_dir={cosmo_dir}\n")
