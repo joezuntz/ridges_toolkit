@@ -11,7 +11,6 @@ import traceback
 SIM_NSIDE = 1024
 MASK_NSIDE = 4096
 
-
 def create_resizable_dataset(group, name, dtype, max_size):
     group.create_dataset(
         name,
