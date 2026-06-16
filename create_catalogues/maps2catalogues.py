@@ -400,6 +400,7 @@ def run_on_full_cosmogrid():
     output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
     gold_mask_filename = f"{output_base_dir}/desy3_gold_mask.npy"
 
+
     # Each different cosmology has its own directory.
     # They are numbered but some numbers are missing, so
     # we just find all of their names instead of using a range.
@@ -425,14 +426,23 @@ def run_on_full_cosmogrid():
             # construct all the file paths we need
             cosmogrid_file = f"{base_dir}/{cosmo_dir}/{perm_dir}/projected_probes_maps_v11dmb.h5"
             output_dir = f"{output_base_dir}/{cosmo_dir}"
+            os.makedirs(output_dir, exist_ok=True)
+
+            marker_file = os.path.join(output_dir, f"complete.{permutation}")
+            # skip if the completion marker is already done.
+            if os.path.exists(marker_file):
+                continue
             # we don't want to have too many directories so we collect
             # the different permutations together in the same directory
             prefix = perm_dir + "_"
-            os.makedirs(output_dir, exist_ok=True)
 
             # Try running the main function, but if something goes wrong, log it to the file
             try:
                 main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix)
+                # when all has completed, add a marker file to the output dir
+                # so we know this permutation is done
+                open(marker_file).close()
+
             except Exception as error:
                 # While testing, let errors cause a crash as normal.
                 # once things are working we can catch any occasional errors
