@@ -31,7 +31,7 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
     fail_mask = np.zeros(ridges.shape[0], dtype=np.int8)
     for i in prange(ridges.shape[0]):
         # Compute the update movements for each point
-        # get all the points within the 3 sigma bandwidth
+        # get all the points within NUM_BANDWIDTHS_QUERY bandwidths (currently 4)
         count = all_counts[i]
         if count == 0:
             fail_mask[i] = 1
@@ -57,7 +57,7 @@ def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indic
     updates = np.zeros(ridges.shape)
     for i in prange(ridges.shape[0]):
         # Compute the update movements for each point
-        # get all the points within the 3 sigma bandwidth
+        # get all the points within NUM_BANDWIDTHS_QUERY bandwidths (currently 4)
         nearby_indices = all_nearby_indices[i]
         distance = all_distances[i]
         # I don't recall why we are copying these. Maybe for
