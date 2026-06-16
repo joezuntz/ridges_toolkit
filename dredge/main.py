@@ -239,7 +239,7 @@ def find_filaments(
                 checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
 
     nfail = fail_mask.sum()
-    print(f"Rank {rank} finshed and removing {nfail}/{fail_mask.size} points that lost neighbours")
+    print(f"Rank {rank} finished and removing {nfail}/{fail_mask.size} points that lost neighbours")
     ridges = ridges[~fail_mask]
 
     # We also record the density at the end of the iterations - we may want to cut
