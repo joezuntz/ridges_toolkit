@@ -8,8 +8,8 @@ global:
     source_bins: [3]
 
 # You can find complete listings of the parameters
-# available for each of these sections in the
-# config.py files in the ridge_sims and ridge_analysis directories.
+# available for each of these sections in the
+# config.py files in the ridge_sims and ridge_analysis directories.
 
 simulate:
     dx: 300.0
