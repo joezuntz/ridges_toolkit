@@ -419,7 +419,7 @@ def run_on_full_cosmogrid():
     # Whether to log the failures, and
     # how many cosmologies to do
     log_failures = False
-    max_n_cosmo = 64
+    max_n_cosmo = 2500
 
     cosmo_dirs = cosmo_dirs[:max_n_cosmo]
 
