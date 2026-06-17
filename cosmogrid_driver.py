@@ -2,7 +2,7 @@ import ridge_analysis
 import glob
 import os
 import traceback
-
+from timeit import default_timer
 
 base_catalog_dir = "/pscratch/sd/z/zuntz/ridges/v1"
 base_output_dir = "/pscratch/sd/z/zuntz/ridges/v1-analysis1"
@@ -32,7 +32,8 @@ def locate_ridges(cosmogrid_run, cosmogrid_index, permutation, comm, ridge_dir):
             "checkpoint_dir": None,
             "seed": seed,
         }
-        print(f"Running dredge {config['lens_catalog_file']} -> {config['ridge_point_file']}")
+        if comm is None or comm.rank == 0:
+            print(f"Running dredge {config['lens_catalog_file']} -> {config['ridge_point_file']}")
 
         config = ridge_analysis.DredgeConfig(**config, **dredge_config)
         ridge_analysis.locate_ridge_points(config, comm=comm)
@@ -44,6 +45,7 @@ def main():
     permutation = 0
 
     for i, cosmo_dir in enumerate(cosmo_dirs):
+        t0 = default_timer()
         # check if this cosmology actually has a completed set of catalogs
         cat_marker_file = os.path.join(base_catalog_dir, cosmo_dir, f"complete.{permutation}")
         if not os.path.exists(cat_marker_file):
@@ -66,6 +68,9 @@ def main():
             open(output_marker_file).close()
         except Exception:
             print(traceback.format_exc())
+        t1 = default_timer()
+        if comm.rank == 0:
+            print(f"Run on {cosmo_dir} took {(t1-t0)/60:.2f} minutes")
 
 
 
