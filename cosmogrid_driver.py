@@ -32,7 +32,8 @@ def locate_ridges(cosmogrid_run, cosmogrid_index, permutation, comm, ridge_dir):
             "checkpoint_dir": None,
             "seed": seed,
         }
-    
+        print(f"Running dredge {config['lens_catalog_file']} -> {config['ridge_point_file']}")
+
         config = ridge_analysis.DredgeConfig(**config, **dredge_config)
         ridge_analysis.locate_ridge_points(config, comm=comm)
 
