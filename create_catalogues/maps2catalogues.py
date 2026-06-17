@@ -467,10 +467,10 @@ def run_on_full_cosmogrid():
                 # While testing, let errors cause a crash as normal.
                 # once things are working we can catch any occasional errors
                 t1 = timer()
-                print(f"Rank {rank} ERROR {cosmo_dir} permutation {permutation} afer {t1-t0:.1f} seconds")
+                print(f"Rank {rank} ERROR {cosmo_dir} permutation {permutation} after {t1-t0:.1f} seconds")
                 if log_failures:
                     failure_log.write("\n\n" + str(error) + "\n")
-                    failure_log.write(f"perm={i} cosmo_dir={cosmo_dir}\n")
+                    failure_log.write(f"perm={permutation} cosmo_dir={cosmo_dir}\n")
                     failure_log.write(traceback.format_exc())
                 else:
                     raise
