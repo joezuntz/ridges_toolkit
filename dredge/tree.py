@@ -96,6 +96,23 @@ class HealpixTree:
         max_size = self.max_npix * len(nearby_pixels)
         indices, distances = _query_core(theta, phi, self.theta, self.phi, radius, nearby_pixels, self.pixels_to_indices, max_size)
         return indices, distances
+    
+    def query_radii(self, thetas, phis, radius):
+        """
+        For each (theta, phi) wuery value, find all points within radius radians
+        of any of them, and get the index of the nearest query point and distance to it
+        """
+        nearby_pixels = set()
+        for theta, phi in zip(thetas, phis):
+            pix = hp.query_disc(self.nside, hp.ang2vec(theta, phi), radius, inclusive=True)
+            nearby_pixels.update(pix)
+        nearby_pixels = np.fromiter(nearby_pixels, dtype=np.int64)
+        max_size = self.max_npix * len(nearby_pixels)
+        indices, distances, nearest_query_point = _multi_query_core(thetas, phis, self.theta, self.phi, radius, nearby_pixels, self.pixels_to_indices, max_size)
+        return indices, distances, nearest_query_point
+
+    
+
 
 @numba.njit
 def _query_core(theta_query, phi_query, theta_bg, phi_bg, radius, nearby_pixels, pixels_to_indices, max_size):
@@ -126,6 +143,53 @@ def _query_core(theta_query, phi_query, theta_bg, phi_bg, radius, nearby_pixels,
     output = output[distance < radius]
     # return the indices of the points within the radius
     return output, distance[distance < radius]
+
+@numba.njit
+def _multi_query_core(theta_queries, phi_queries, theta_bg, phi_bg, radius, nearby_pixels, pixels_to_indices, max_size):
+    """
+    This internal function finds all points closer than radius
+    to the query point.
+
+    Here the query points are assumed to be scalar and the backgrounds to be arrays.
+    """
+    output = np.empty(max_size, dtype=np.int64)
+    output_idx = 0
+    # The pixels_to_indices dict maps healpix pixel indices to the indices
+    # in the background coordinates of all the objects in that pixel.
+    # If any pixels are not in pixels_to_indices then that means that there are
+    # no objects in that pixel and it can safely be ignored.
+    for p in nearby_pixels:
+        if p in pixels_to_indices:
+            for idx in pixels_to_indices[p]:
+                output[output_idx] = idx
+                output_idx += 1
+    if output_idx == 0:
+        output = np.zeros(0, dtype=np.int64)
+        distance = np.zeros(0, dtype=np.float64)
+        nearest_query_point = np.zeros(0, dtype=np.int64)
+        return output, distance, nearest_query_point
+    output = output[:output_idx]
+    # output is now all the indices of background galaxies near
+    # any ridge point
+    distance = np.zeros(output.size, dtype=np.float64)
+    distance[:] = np.inf
+    nearest_query_point = np.zeros(output.size, dtype=np.int64)
+    # get the great circle distance betwen the input point and output points
+    i = 0
+    nquery = theta_queries.size
+    for i in range(nquery):
+        d = haversine_distance(theta_queries[i], phi_queries[i], theta_bg[output], phi_bg[output])
+        
+        is_closer = d < distance
+        distance[is_closer] = d[is_closer]
+        nearest_query_point[is_closer] = np.int64(i)
+    # return the indices of the points within the radius
+    near_enough = distance < radius
+    return output[near_enough], distance[near_enough], nearest_query_point[near_enough]
+
+
+
+
 
 
 def make_tree(coordinates, tree_nside):
