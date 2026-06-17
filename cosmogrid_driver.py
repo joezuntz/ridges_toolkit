@@ -65,7 +65,7 @@ def main():
         try:
             locate_ridges(cosmo_dir, i, permutation, comm, output_dir)
             # make the marker file indicating we have finished
-            open(output_marker_file).close()
+            open(output_marker_file, "w").close()
         except Exception:
             print(traceback.format_exc())
         t1 = default_timer()
