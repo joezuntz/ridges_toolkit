@@ -36,6 +36,13 @@ def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_d
         if count == 0:
             fail_mask[i] = 1
             continue
+
+        # Because numba needs arrays not lists we have to waste some memory
+        # here, and the all_nearby_indices and all_distances arguments both
+        # are sized to include the maximum possible number of neighbours
+        # (since the universe is pretty homogenous this isn't a big waste).
+        # So here we extract the actually valid bits of those arrays, which
+        # are indicated by the count variable.
         nearby_indices = all_nearby_indices[i][:count].copy()
         distance = all_distances[i][:count].copy()
         nearby_coordinates = coordinates[nearby_indices].copy()

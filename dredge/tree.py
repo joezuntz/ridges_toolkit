@@ -72,17 +72,45 @@ class HealpixTree:
 
     def query_radius(self, theta, phi, radius):
         """
-        Find the indices of the points in the tree that are within a given radius of the input points. The radius is in radians.
+        Find the indices of the points in the tree that are within a given radius of the input points. 
+        The radius is in radians.
+
+        Parameters
+        ----------
+        theta: float
+            Co-latitude of the point to query in radians
+        phi: float
+            Longitude of the point to query in radians
+        radius:
+            Distance in radians of points to query
+
+        Returns
+        -------
+        indices: array, 1D, integer
+            The indices of points in self.theta and self.phi that are within the
+            distance radius of the query point
+        distances: array, 1D, float
+            The haversince distance in radians to each point
         """
         nearby_pixels = hp.query_disc(self.nside, hp.ang2vec(theta, phi), radius, inclusive=True)
         max_size = self.max_npix * len(nearby_pixels)
-        rval = _query_core(theta, phi, self.theta, self.phi, radius, nearby_pixels, self.pixels_to_indices, max_size)
-        return rval
+        indices, distances = _query_core(theta, phi, self.theta, self.phi, radius, nearby_pixels, self.pixels_to_indices, max_size)
+        return indices, distances
 
 @numba.njit
 def _query_core(theta_query, phi_query, theta_bg, phi_bg, radius, nearby_pixels, pixels_to_indices, max_size):
+    """
+    This internal function finds all points closer than radius
+    to the query point.
+
+    Here the query points are assumed to be scalar and the backgrounds to be arrays.
+    """
     output = np.empty(max_size, dtype=np.int64)
     output_idx = 0
+    # The pixels_to_indices dict maps healpix pixel indices to the indices
+    # in the background coordinates of all the objects in that pixel.
+    # If any pixels are not in pixels_to_indices then that means that there are
+    # no objects in that pixel and it can safely be ignored.
     for p in nearby_pixels:
         if p in pixels_to_indices:
             for idx in pixels_to_indices[p]:
@@ -103,9 +131,9 @@ def _query_core(theta_query, phi_query, theta_bg, phi_bg, radius, nearby_pixels,
 def make_tree(coordinates, tree_nside):
     """
     Creates or loads a spatial tree structure based on the given coordinates.
-    This function either builds a new tree from the provided coordinates or
-    loads an existing tree from a file. Optionally, it can save the newly
-    created tree to a file for future use.
+    This function builds a new tree from the provided coordinates. This is now fast
+    enough that it doesn't seem worth saving the tree to disc, though we can add that
+    easily enough if we want.
 
     Parameters
     -----------
@@ -161,6 +189,8 @@ def query_tree(tree: HealpixTree, points, radius):
     output = []
     output_distances = []
     npoint = len(points)
+    # For each query point we ask the tree for nearby points,
+    # and then record the complete list
     counts = np.zeros(npoint, dtype=np.int64)
     for i, (theta, phi) in enumerate(points):
         theta = np.pi/2 - theta
@@ -169,6 +199,9 @@ def query_tree(tree: HealpixTree, points, radius):
         output.append(indices)
         output_distances.append(distances)
     
+    # Pack the indices and distances into a rectangular array,
+    # only part of which is referenced. The valid range is indicated
+    # by the counts variable.
     max_output = np.max(counts)
     packed_indices = np.zeros((npoint, max_output), dtype=np.int64)
     packed_distances = np.zeros((npoint, max_output), dtype=np.float64)

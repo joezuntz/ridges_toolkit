@@ -67,9 +67,6 @@ def find_filaments(
         The nside parameter of the tree-like structure used in finding
         nearby points.
 
-    distance_metric: string, defaults to 'haversine'
-        The distance function to be used, can be 'haversine' or 'euclidean'.
-
     mesh_threshold: float, defaults to 4.0
         Throw away initial mesh point more than this many bandwidths from any coordinate
 
