@@ -7,6 +7,9 @@ from .io import ShearMeasurement, RidgeSegmentCatalog, SourceCatalog
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import numba
+from dredge.utils import haversine_distance
+from dredge.tree import HealpixTree
+import gc
 
 
 @numba.njit
@@ -22,40 +25,9 @@ def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
     return np.arctan2(y, x) % (2 * np.pi) + np.pi / 2
 
 
-@numba.njit
-def haversine_distance(source_coords, filament_coords):
-    """
-    Compute the haversine distance between two points on the sphere.
-    All inputs are expected to be in radians.
-
-    Supports scalar inputs, same-shaped arrays, and pairwise distances for
-    different-length 1D arrays (returns an N1 x N2 matrix).
-    """
-    ra1 = source_coords[:, 1]
-    dec1 = source_coords[:, 0]
-    ra2 = filament_coords[:, 1]
-    dec2 = filament_coords[:, 0]
-
-    # ra1 = np.asarray(ra1)
-    # dec1 = np.asarray(dec1)
-    # ra2 = np.asarray(ra2)
-    # dec2 = np.asarray(dec2)
-
-    # If both are 1D and have different lengths, compute all pairwise distances.
-    # if ra1.ndim == dec1.ndim == ra2.ndim == dec2.ndim == 1 and ra1.size != ra2.size:
-    ra1 = ra1[:, None]
-    dec1 = dec1[:, None]
-    ra2 = ra2[None, :]
-    dec2 = dec2[None, :]
-
-    deltalon = ra2 - ra1
-    deltalat = dec2 - dec1
-    a = np.sin(deltalat / 2) ** 2 + np.cos(dec1) * np.cos(dec2) * np.sin(deltalon / 2) ** 2
-    a = np.clip(a, 0.0, 1.0)
-    return 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
 
-def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
+def precompute_pixel_regions(source_catalog, nside_coverage, flip_g1=False, flip_g2=False):
     """
     Split up the source catalot into low-resolution healpix pixels for fast lookup later on.
 
@@ -78,25 +50,66 @@ def precompute_pixel_regions(ras, decs, g1, g2, weights, nside_coverage):
         A dictionary mapping low-resolution healpix pixel indices to tuples of
         (ras, decs, g1, g2) for the sources in that pixel.
     """
+
+    ras = np.radians(source_catalog.ra) % (2 * np.pi)
+    decs = np.radians(source_catalog.dec)
+    g1 = source_catalog.g1
+    g2 = source_catalog.g2
+    weights = source_catalog.weight
+    ntotal = ras.size
+
+    if flip_g1:
+        g1 *= -1
+    if flip_g2:
+        g2 *= -1
+
     assert np.max(ras) < 3 * np.pi, "RA values should be in radians"
 
     # 110 arcmin, so as we are only going out to 1 degree that should be enough for any
     # adjacent pixels.
     source_healpix_low_res = hp.ang2pix(nside_coverage, np.pi / 2 - decs, ras)
-    unique_pix = np.unique(source_healpix_low_res)
+    unique_pix, unique_counts = np.unique(source_healpix_low_res, return_counts=True)
     n_unique_pixels = len(unique_pix)
+    max_count = unique_counts.max()
+
+
     print(f"Precomputing source pixel regions: {n_unique_pixels} unique pixels at nside {nside_coverage}")
-    # 1715 pixels, so a nice reduction but not too small.
-    pixel_regions = {}
+    # for nside=32 1715 pixels, so a nice reduction but not too small.
 
-    # This takes < 1 minute.
-    # I tried speeding it up with numba and by making it a single
-    # pass through the data, but it was much slower.
-    for i in unique_pix:
-        index = np.where(source_healpix_low_res == i)[0]
-        pixel_regions[i] = (ras[index], decs[index], g1[index], g2[index], weights[index])
+    index_map = numba.typed.Dict.empty(
+            key_type=numba.int64,
+            value_type=numba.int64
+    )
+    for i, p in enumerate(unique_pix):
+        index_map[p] = i
 
-    return pixel_regions
+
+    pixel_regions = _precompute_core(source_healpix_low_res, ras, decs, g1, g2, weights, n_unique_pixels, max_count, index_map)
+
+    output = {}
+    for i, p in enumerate(unique_pix):
+        output[p] = pixel_regions[:, i, :unique_counts[i]].copy()
+
+    nb = 0.0
+    for p in output.values():
+        nb += p.nbytes
+
+    print(f"Precomputed pixel regions use {nb / 1e9:.2f} GB of memory")
+
+    return output, ntotal
+
+@numba.njit
+def _precompute_core(source_healpix_low_res, ras, decs, g1, g2, weights, n_unique_pixels, max_count, index_map):
+    output = np.zeros((5, n_unique_pixels, max_count))
+    count = np.zeros(n_unique_pixels, dtype=np.int64)
+    n_gal = source_healpix_low_res.shape[0]
+    for i in range(n_gal):
+        pix = source_healpix_low_res[i]
+        j = index_map[pix]
+        c = count[j]
+        output[:, j, c] = ras[i], decs[i], g1[i], g2[i], weights[i]
+        count[j] += 1
+    return output
 
 
 def get_nearby_sources(raf, decf, pixel_regions, nside_coverage, max_ang_rad):
@@ -119,33 +132,68 @@ def get_nearby_sources(raf, decf, pixel_regions, nside_coverage, max_ang_rad):
 
     # Include the filament pixels themselves, and then get unique values
     # pixels_needed = np.unique(np.concatenate((pixels_needed, filament_pix_low_res)))
-    ra = []
-    dec = []
-    g1 = []
-    g2 = []
-    weight = []
+    n_sources = sum(pixel_regions[p].shape[1] for p in pixels_needed if p in pixel_regions)
+    if n_sources == 0:
+        return None, None, None, None, None, None
 
+
+    ra = np.empty(n_sources)
+    dec = np.empty(n_sources)
+    g1 = np.empty(n_sources)
+    g2 = np.empty(n_sources)
+    weight = np.empty(n_sources)
+    i = 0
     for p in pixels_needed:
         if p in pixel_regions:
             ras_s, decs_s, g1_s, g2_s, w_s = pixel_regions[p]
-            ra.append(ras_s)
-            dec.append(decs_s)
-            g1.append(g1_s)
-            g2.append(g2_s)
-            weight.append(w_s)
+            n = ras_s.shape[0]
+            ra[i : i + n] = ras_s
+            dec[i : i + n] = decs_s
+            g1[i : i + n] = g1_s
+            g2[i : i + n] = g2_s
+            weight[i : i + n] = w_s
+            i += n
 
-    if len(ra) == 0:
-        return None, None, None, None, None, None
-
-    ra = np.concatenate(ra)
-    dec = np.concatenate(dec)
-    g1 = np.concatenate(g1)
-    g2 = np.concatenate(g2)
-    weight = np.concatenate(weight)
     source_coords = np.array([dec, ra]).T
 
     return source_coords, ra, dec, g1, g2, weight
 
+@numba.njit
+def get_nearest_filament_distances(filament_coords, source_coords):
+    # Get the distance between
+    # nfil = filament_coords.shape[0]
+    nsource = source_coords.shape[0]
+    distances = np.zeros(nsource)
+    indices = np.zeros(nsource, dtype=np.int64)
+    theta_fil = np.pi/2 - filament_coords[:, 0]
+    phi_fil = filament_coords[:, 1]
+    for i in range(nsource):
+        # need healpix convention I think!
+        theta_source = np.pi/2 - source_coords[i, 0]
+        phi_source = source_coords[i, 1]
+        d = haversine_distance(theta_source, phi_source, theta_fil, phi_fil)
+        nearest = d.argmin()
+        distances[i] = d[nearest]
+        indices[i] = nearest
+    return distances, indices
+    # nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine", algorithm="brute").fit(filament_coords)
+    # distances, indices = nbrs.kneighbors(source_coords)
+    # indices = indices[:, 0]
+    # distances = distances[:, 0]
+
+
+def tree_find_neighbours(tree, filament_coords, max_ang_rad):
+    # Get the nearby sources using the tree.
+    all_indices = []
+    all_distances = []
+    for i in range(filament_coords.shape[0]):
+        theta_fil = np.pi/2 - filament_coords[i, 0]
+        phi_fil = filament_coords[i, 1]
+        indices, distances = tree.query_radius(theta_fil, phi_fil, max_ang_rad)
+        # do something with the indices and distances
+        all_indices.append(indices)
+        all_distances.append(distances)
+    return all_indices, all_distances
 
 def measure_shear(
     ridge_catalog: RidgeSegmentCatalog,
@@ -212,10 +260,10 @@ def measure_shear(
     min_ang_rad = np.radians(min_distance_arcmin / 60)
     max_ang_rad = np.radians(max_distance_arcmin / 60)
 
-    coverage_pixel_size = hp.nside2resol(nside_coverage, arcmin=True)
-    assert (
-        coverage_pixel_size > max_distance_arcmin
-    ), "Coverage pixel size ({coverage_pixel_size} arcmin) must be larger than max_distance_arcmin ({max_distance_arcmin} arcmin). Decrease nside_coverage."
+    # coverage_pixel_size = hp.nside2resol(nside_coverage, arcmin=True)
+    # assert (
+    #     coverage_pixel_size > max_distance_arcmin
+    # ), "Coverage pixel size ({coverage_pixel_size} arcmin) must be larger than max_distance_arcmin ({max_distance_arcmin} arcmin). Decrease nside_coverage."
 
     start_time = time.time()
 
@@ -228,16 +276,6 @@ def measure_shear(
     # The source catalog is split among the different processes.
     # The should have been done already when loading in the first place,
     # in the calling function.
-    ra_background = np.radians(source_catalog.ra) % (2 * np.pi)
-    dec_background = np.radians(source_catalog.dec)
-    g1_background = source_catalog.g1
-    g2_background = source_catalog.g2
-    weights_background = source_catalog.weight
-
-    if flip_g1:
-        g1_background *= -1
-    if flip_g2:
-        g2_background *= -1
 
     bin_sums_plus = np.zeros(num_bins)
     bin_sums_cross = np.zeros(num_bins)
@@ -255,14 +293,14 @@ def measure_shear(
 
     # Pre-split the catalog into a low-resolution map, so that we can just look up pixels
     # that are relatively close to the filament points later.
-    pixel_regions = precompute_pixel_regions(
-        ra_background,
-        dec_background,
-        g1_background,
-        g2_background,
-        weights_background,
+    pixel_regions, ntotal = precompute_pixel_regions(
+        source_catalog,
         nside_coverage,
+        flip_g1=flip_g1,
+        flip_g2=flip_g2,
     )
+    source_catalog.unload()
+    # tree = HealpixTree(theta=np.pi/2 - dec_background, phi=ra_background, nside=nside_coverage)
 
     # Angular bins for the shear measurement in radians.
     # We use a similar configuration to galaxy-galaxy lensing.
@@ -270,6 +308,12 @@ def measure_shear(
 
     start_time = time.time()
     n_filaments = ridge_catalog.metadata["n_filaments"]
+    if rank == 0:
+        print(f"Starting shear measurement with {n_filaments} filaments and {ntotal} sources")
+
+    if rank == 0:
+        import tqdm
+        pbar = tqdm.tqdm(total=n_filaments)
 
     for (filament_index, filament_ra, filament_dec) in ridge_catalog.iterate_ridges(radians=True):
         filament_coords = np.array([filament_dec, filament_ra]).T
@@ -282,23 +326,21 @@ def measure_shear(
         source_coords, ra_subset, dec_subset, g1_subset, g2_subset, weights_subset = get_nearby_sources(
             filament_ra, filament_dec, pixel_regions, nside_coverage, max_ang_rad
         )
+        
 
         # There may be no sources near this filament segment
         if source_coords is None:
             continue
 
-        if (rank == 0) and (filament_index % 100 == 0):
-            print(
-                f"[{rank}] Processing filament {filament_index} / {n_filaments} - {source_coords.shape[0]} nearby sources"
-            )
-
         # The brute force algorithm here is faster for the tests I've been doing than a
         # tree, because the number of filament points is not that high. That might change with
         # different ridge choices.
+        # custom JIT version of this was slower.
         nbrs = NearestNeighbors(n_neighbors=1, leaf_size=75, metric="haversine", algorithm="brute").fit(filament_coords)
         distances, indices = nbrs.kneighbors(source_coords)
         indices = indices[:, 0]
         distances = distances[:, 0]
+        # distances, indices = get_nearest_filament_distances(filament_coords, source_coords)
         matched_filament_points = filament_coords[indices]
 
         # Get the rotation angle phi between the background galaxy and the filament point
@@ -328,6 +370,10 @@ def measure_shear(
         np.add.at(bin_weighted_distances, bin_indices[valid_bins], weights_subset[valid_bins] * distances[valid_bins])
         np.add.at(bin_weights, bin_indices[valid_bins], weights_subset[valid_bins])
         np.add.at(bin_counts, bin_indices[valid_bins], 1)
+
+        if rank == 0:
+            pbar.update(1)
+        gc.collect()
 
     # Sum up the results from all processes, so the totals are correct
     sum_in_place(bin_sums_plus, comm)

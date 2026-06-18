@@ -25,7 +25,7 @@ class DredgeConfig:
     checkpoint_dir: str
     bandwidth: float = 6.0  # in arcmin
     num_ridge_points: int = 500_000
-    neighbours: int = 5000
+    tree_nside: int = 128
     convergence: float = 0.03  # in arcmin
     seed: int = 0
     lens_zmin: float = 0.0
@@ -39,7 +39,7 @@ class DredgeConfig:
         "checkpoint_dir": "Directory to save intermediate results and checkpoints.",
         "bandwidth": "Bandwidth for density estimation in arcminutes.",
         "num_ridge_points": "Number of ridge points to generate.",
-        "neighbours": "Number of nearest neighbors to consider for density estimation.",
+        "tree_nside": "The nside parameter of the tree-like structure used in finding nearby points.",
         "convergence": "Convergence threshold for ridge point identification in arcminutes.",
         "seed": "Random seed for reproducibility.",
         "lens_zmin": "Minimum redshift of lenses to consider.",

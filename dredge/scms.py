@@ -7,36 +7,54 @@ from numba.core.errors import NumbaPerformanceWarning
 # Suppress Numba performance warnings
 warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+NUM_BANDWIDTHS_QUERY = 4
 
-def ridge_update(ridges, coordinates, bandwidth, tree, n_neighbors, weights=None):
-    all_nearby_indices, all_distances = query_tree(tree, ridges, n_neighbors)
+
+def ridge_update(ridges, coordinates, bandwidth, tree, weights=None):
+    all_nearby_indices, all_counts, all_distances = query_tree(tree, ridges, bandwidth*NUM_BANDWIDTHS_QUERY)
+
     if weights is None:
-        updates = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances)
+        updates, fail_mask = ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, all_counts)
     else:
-        updates = weighted_ridge_update_inner(
+        raise NotImplementedError("Weighted updates are not yet implemented")
+        updates, fail_mask = weighted_ridge_update_inner(
             ridges, coordinates, bandwidth, all_nearby_indices, all_distances, weights
         )
-    return updates
+    return updates, fail_mask
 
 
 @njit(parallel=True)
-def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances):
+def ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indices, all_distances, all_counts):
     # Create a list to store all update values
     update_sizes = np.zeros(ridges.shape[0])
     updates = np.zeros(ridges.shape)
+    fail_mask = np.zeros(ridges.shape[0], dtype=np.int8)
     for i in prange(ridges.shape[0]):
         # Compute the update movements for each point
-        # get all the points within the 3 sigma bandwidth
-        nearby_indices = all_nearby_indices[i]
-        distance = all_distances[i]
+        # get all the points within NUM_BANDWIDTHS_QUERY bandwidths (currently 4)
+        count = all_counts[i]
+        if count == 0:
+            fail_mask[i] = 1
+            continue
+
+        # Because numba needs arrays not lists we have to waste some memory
+        # here, and the all_nearby_indices and all_distances arguments both
+        # are sized to include the maximum possible number of neighbours
+        # (since the universe is pretty homogenous this isn't a big waste).
+        # So here we extract the actually valid bits of those arrays, which
+        # are indicated by the count variable.
+        nearby_indices = all_nearby_indices[i][:count].copy()
+        distance = all_distances[i][:count].copy()
         nearby_coordinates = coordinates[nearby_indices].copy()
 
-        updates[i] = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
+        updates[i], status = update_function(ridges[i], nearby_coordinates, bandwidth, distance)
+        if status == 1:
+            fail_mask[i] = 1
 
         # Store the change between updates to check convergence
         update_sizes[i] = np.sum(np.abs(updates[i]))
     ridges += updates
-    return update_sizes
+    return update_sizes, fail_mask
 
 
 @njit(parallel=True)
@@ -46,7 +64,7 @@ def weighted_ridge_update_inner(ridges, coordinates, bandwidth, all_nearby_indic
     updates = np.zeros(ridges.shape)
     for i in prange(ridges.shape[0]):
         # Compute the update movements for each point
-        # get all the points within the 3 sigma bandwidth
+        # get all the points within NUM_BANDWIDTHS_QUERY bandwidths (currently 4)
         nearby_indices = all_nearby_indices[i]
         distance = all_distances[i]
         # I don't recall why we are copying these. Maybe for
@@ -99,12 +117,17 @@ def update_function(point, coordinates, bandwidth, distance):
     squared_distance = distance**2
     # evaluate the kernel at each distance
     weights = gaussian_kernel(squared_distance, bandwidth)
+    weight_sum = np.sum(weights)
+    if weight_sum < 1e-30:
+        return np.zeros_like(point), 1
     # now reweight each point
-    shift = coordinates.T @ weights / np.sum(weights)
+    shift = coordinates.T @ weights / weight_sum
     # first, we evaluate the mean shift update
     update = shift - point
     # Calculate the local inverse covariance for the decomposition
-    inverse_covariance = local_inv_cov(point, coordinates, bandwidth)
+    inverse_covariance, status = local_inv_cov(point, coordinates, bandwidth)
+    if status == 1 or np.any(~np.isfinite(inverse_covariance)):
+        return np.zeros_like(point), 1
     # Compute the eigendecomposition of the local inverse covariance
     eigen_values, eigen_vectors = np.linalg.eig(inverse_covariance)
     # Align the eigenvectors with the sorted eigenvalues
@@ -115,7 +138,7 @@ def update_function(point, coordinates, bandwidth, distance):
     # Project the update to the eigenvector-spanned orthogonal subspace
     point_updates = cut_eigen_vectors.dot(cut_eigen_vectors.T).dot(update)
     # Return the projections as the point updates
-    return point_updates
+    return point_updates, 0
 
 
 @njit
@@ -265,6 +288,9 @@ def local_inv_cov(point, coordinates, bandwidth):
     weight_sum = np.sum(weights)
     weight_average = weight_sum / number_points
 
+    if not (weight_average**2 > 0):
+        return np.zeros((number_columns, number_columns)), 1
+
     # Compute the location differences between the point and the dataset
     mu = (coordinates - point) / bandwidth**2
 
@@ -276,7 +302,8 @@ def local_inv_cov(point, coordinates, bandwidth):
     # This is an extra term that is not in the paper
     grad = -mean1(weights * mu.T)
     inv_cov = -H / weight_average + (grad @ grad) / weight_average**2
-    return inv_cov
+
+    return inv_cov, 0
 
 
 def mesh_generation(coordinates, num_ridge_points, seed=None):

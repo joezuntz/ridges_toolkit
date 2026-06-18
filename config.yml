@@ -3,13 +3,13 @@ global:
     ridge_dir: ./example
     segment_dir: ./example
     plot_dir: ./example
-    shear_dir: ./example
+    shear_dir: ./example-tree
     lens_bins: [0]
     source_bins: [0]
 
 # You can find complete listings of the parameters
-# available for each of these sections in the
-# config.py files in the ridge_sims and ridge_analysis directories.
+# available for each of these sections in the
+# config.py files in the ridge_sims and ridge_analysis directories.
 
 simulate:
     dx: 300.0
@@ -27,6 +27,7 @@ dredge:
     seed: 888
     num_ridge_points: 1000000
     shift_180: true
+    tree_nside: 128
 
 segment:
     density_percentile: 0.0
@@ -44,4 +45,4 @@ shear:
     num_bins: 20
     min_distance_arcmin: 1.0
     max_distance_arcmin: 60.0
-    nside_coverage: 32
+    nside_coverage: 128

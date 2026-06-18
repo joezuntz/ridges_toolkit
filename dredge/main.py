@@ -1,7 +1,6 @@
 import os
 import sys
 from timeit import default_timer as timer
-from .bandwidth import estimate_bandwidth
 import numpy as np
 from .checkpoints import checkpoint, load_ridge_state
 from .tree import make_tree, cut_points_with_tree
@@ -15,14 +14,12 @@ def find_filaments(
     max_unconverged_fraction=0.005,
     max_iterations=5000,
     num_ridge_points=None,
-    n_neighbors=5000,
-    distance_metric="haversine",
+    tree_nside=128,
     mesh_threshold=4.0,
     checkpoint_dir=None,
     min_checkpoint_gap=30,
     resume=False,
     seed=None,
-    tree_file=None,
     comm=None,
     weights=None,
 ):
@@ -66,12 +63,9 @@ def find_filaments(
     num_ridge_points : int, defaults to None
         The number of mesh points to be used to generate ridges.
 
-    n_neighbors : int, defaults to 5000
-        The number of nearest neighbour points used to update ridge points.
-        You should check convergence of this parameter for your use case.
-
-    distance_metric: string, defaults to 'haversine'
-        The distance function to be used, can be 'haversine' or 'euclidean'.
+    tree_nside : int, defaults to 128
+        The nside parameter of the tree-like structure used in finding
+        nearby points.
 
     mesh_threshold: float, defaults to 4.0
         Throw away initial mesh point more than this many bandwidths from any coordinate
@@ -93,11 +87,6 @@ def find_filaments(
         If provided, sets the random seed for reproducibility.
         Required if using checkpointing as otherwise the resumed
         run will not match the original run.
-
-    tree_file: str, defaults to None
-        If provided, the file where the BallTree will be saved or loaded from.
-        If the file exists, it will be loaded; otherwise, a new tree will be created.
-        This is mainly useful when testing.
 
     comm: mpi4py.MPI.Comm, defaults to None
         If provided, the MPI communicator to use for parallel processing.
@@ -132,43 +121,38 @@ def find_filaments(
     # parallelization information
     is_root = comm is None or comm.rank == 0
     rank = 0 if comm is None else comm.rank
+    comm_size = 1 if comm is None else comm.size
 
     # make checkpointing directory if it does not exist
     if checkpoint_dir is not None and is_root:
         os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Only the root process makes the mesh and the tree, so that
+    # Only the root process makes the tree, so that
     # every process is using the exact same one.
     if is_root:
-        print("Generated mesh.  Making tree.")
-        # Create an evenly-spaced mesh in for the provided coordinates
-        ridges = mesh_generation(coordinates, num_ridge_points, seed)
-
         # Make the ball tree to speed up finding nearby points
-        tree = make_tree(coordinates, distance_metric, tree_file)
-
-        # remove any ridges that are more than mesh_threshold bandwidths from any point
-        # We do the cutting here on the root process so that each process actually does get the
-        # same number of points to work with.
-        print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
-        ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
-        print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
-
+        print("Making tree.")
+        tree = make_tree(coordinates, tree_nside)
     else:
-        # Other processes do not make them, but instead are sent them just below
-        # here
         tree = None
-        ridges = None
 
     if comm is not None:
-        # These commands send a copy of the tree and the ridges
+        # These commands send a copy of the tree
         # to all the processes
         tree = comm.bcast(tree, root=0)
-        ridges = comm.bcast(ridges, root=0)
 
-        # Split up the ridges so that each process gets an
-        # evenly sized subset.
-        ridges = np.array_split(ridges, comm.size)[comm.rank]
+    my_num_ridge_points = num_ridge_points // comm_size
+    # Create an evenly-spaced mesh in for the provided coordinates
+    seed_for_rank = None if seed is None else (seed, rank)
+    ridges = mesh_generation(coordinates, my_num_ridge_points, seed_for_rank)
+# remove any ridges that are more than mesh_threshold bandwidths from any point
+# This cut runs independently on each rank (after broadcasting the tree).
+    if is_root:
+        print(f"Cutting initial mesh to points within {mesh_threshold} bandwidths of a galaxy")
+    ridges = cut_points_with_tree(ridges, tree, bandwidth, threshold=mesh_threshold)
+    if is_root:
+        print(f"Finished cutting. {ridges.shape[0]} mesh points remain.")
+
 
     # Record the initial density of all the points to allow us to do cuts later
     initial_density = estimate_local_density(tree, ridges, bandwidth, weights)
@@ -193,6 +177,7 @@ def find_filaments(
     index = np.arange(ridges.shape[0])
     n_to_update = points_to_update.sum()
     print(f"[Proc {rank}]: iteration {iteration_number}  {n_to_update} points to iterate.")
+    fail_mask = np.zeros(ridges.shape[0], dtype=bool)
 
     # Wait until almost all points have converged. Towards the end the
     # points will be updating very quickly as there are so few of them.
@@ -205,11 +190,18 @@ def find_filaments(
 
         # Update the points in the mesh. Record the timing
         t = timer()
-        updates = ridge_update(ridges_subset, coordinates, bandwidth, tree, n_neighbors)
+        updates, subset_fail_mask = ridge_update(ridges_subset, coordinates, bandwidth, tree)
         time_taken = timer() - t
 
         # Copy the update from this set of ridges to the full set
         ridges[subset_index] = ridges_subset
+
+        # Some points will get zero updates because they have no points in the bandwidth.
+        # This can happen when the previous update moved them to a masked
+        # region. These points will automatically be removed from the updating
+        # process because they didn't move, but we also want to not
+        # return them at the end of the process, so mark them here.
+        fail_mask[subset_index] = subset_fail_mask
 
         # Find which points have converged, and mark in the list of
         # the full set of ridges that they have done so.
@@ -236,6 +228,10 @@ def find_filaments(
                 # Save the current state of the ridges and points to update
                 checkpoint(checkpoint_dir, iteration_number, ridges, points_to_update, comm)
 
+    nfail = fail_mask.sum()
+    print(f"Rank {rank} finished and removing {nfail}/{fail_mask.size} points that lost neighbours")
+    ridges = ridges[~fail_mask]
+
     # We also record the density at the end of the iterations - we may want to cut
     # to high density ridges only.
     final_density = estimate_local_density(tree, ridges, bandwidth, weights)
@@ -258,11 +254,15 @@ def find_filaments(
 
 
 def estimate_local_density(tree, coordinates, bandwidth, weights=None):
-    if weights is None:
-        return tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=True)
-
-    nearby_points = tree.query_radius(coordinates, r=bandwidth, return_distance=False, count_only=False)
-    return np.array([weights[points].sum() for points in nearby_points])
+    density = np.zeros(len(coordinates))
+    for i, (theta, phi) in enumerate(coordinates):
+        theta = np.pi/2 - theta
+        points, _ =tree.query_radius(theta, phi, bandwidth)
+        if weights is None:
+            density[i] = len(points)
+        else:
+            density[i] = weights[points].sum()
+    return density
 
 
 def parameter_check(**p):
@@ -282,16 +282,14 @@ def parameter_check(**p):
     """
 
     coordinates = p["coordinates"]
-    n_neighbours = p["n_neighbors"]
     bandwidth = p["bandwidth"]
     convergence = p["convergence"]
     num_ridge_points = p["num_ridge_points"]
-    distance_metric = p["distance_metric"]
+    tree_nside = p["tree_nside"]
     mesh_threshold = p["mesh_threshold"]
     checkpoint_dir = p["checkpoint_dir"]
     resume = p["resume"]
     seed = p["seed"]
-    tree_file = p["tree_file"]
     comm = p["comm"]
 
     # Check whether two-dimensional coordinates are provided
@@ -304,9 +302,9 @@ def parameter_check(**p):
     if np.any(np.isnan(coordinates)) or np.any(np.isinf(coordinates)):
         raise ValueError("ERROR: coordinates must not contain NaN or Inf values.")
 
-    # Check whether neighbors is a positive integer or float
-    if not (isinstance(n_neighbours, int) and n_neighbours > 0):
-        raise ValueError("ERROR: n_neighbors must be an integer > 0")
+    # Check whether tree_nside is a positive integer
+    if not (isinstance(tree_nside, int) and tree_nside > 0):
+        raise ValueError("ERROR: tree_nside must be a positive integer")
 
     # Check whether bandwidth is a positive float
     if not (isinstance(bandwidth, float) and bandwidth > 0):
@@ -319,10 +317,6 @@ def parameter_check(**p):
     # Check whether num_ridge_points is a positive integer
     if not (isinstance(num_ridge_points, int) and num_ridge_points > 0):
         raise ValueError("ERROR: num_ridge_points must be a positive integer")
-
-    # Check whether distance is one of two allowed strings
-    if distance_metric not in ["haversine", "euclidean"]:
-        raise ValueError("ERROR: distance must be either 'haversine' or 'euclidean'")
 
     # Check whether mesh_threshold is a positive float or int
     if not (isinstance(mesh_threshold, (float, int)) and mesh_threshold > 0):
@@ -339,10 +333,6 @@ def parameter_check(**p):
     # Check whether seed is an integer or None
     if seed is not None and not isinstance(seed, int):
         raise ValueError("ERROR: seed must be an integer or None")
-
-    # Check whether tree_file is a string or None
-    if tree_file is not None and not isinstance(tree_file, str):
-        raise ValueError("ERROR: tree_file must be a string or None")
 
     # Check whether comm is None or an MPI communicator
     if comm is not None and not hasattr(comm, "rank"):
