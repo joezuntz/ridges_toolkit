@@ -164,6 +164,10 @@ def measure_ridge_shear(shear_config: ShearConfig, comm=None):
     source_catalog = SourceCatalog(shear_config.source_catalog_file)
     source_catalog.load(comm=comm, split_over_ranks=True)
 
+    # The weights are sometime int16s to save space but here NUMBA
+    # wants them to be the same as the others
+    source_catalog.data["weight"] = source_catalog.data["weight"].astype(np.float64)
+
     shear_table = measure_shear(
         ridge_segments,
         source_catalog,
