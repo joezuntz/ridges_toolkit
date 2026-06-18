@@ -160,7 +160,7 @@ def measure_shear(
         if filament_dec.size < min_filament_points:
             print(f"[{rank}] Skipping filament {filament_index} (label {filament_index}) with only {filament_dec.size} points")
             continue
-        filament_theta = np.pi/2 - np.radians(filament_dec)
+        filament_theta = np.pi/2 - filament_dec
         filament_phi = filament_ra
         indices, distances, nearest_query_point = tree.query_radii(filament_theta, filament_phi, max_ang_rad)
 
