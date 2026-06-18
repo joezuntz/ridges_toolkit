@@ -20,13 +20,6 @@ def get_position_angle(ra_source, dec_source, ra_filament, dec_filament):
     return np.arctan2(y, x) % (2 * np.pi) + np.pi / 2
 
 
-
-
-
-
-
-
-
 def measure_shear(
     ridge_catalog: RidgeSegmentCatalog,
     source_catalog: SourceCatalog,
@@ -92,18 +85,7 @@ def measure_shear(
     min_ang_rad = np.radians(min_distance_arcmin / 60)
     max_ang_rad = np.radians(max_distance_arcmin / 60)
 
-    # coverage_pixel_size = hp.nside2resol(nside_coverage, arcmin=True)
-    # assert (
-    #     coverage_pixel_size > max_distance_arcmin
-    # ), "Coverage pixel size ({coverage_pixel_size} arcmin) must be larger than max_distance_arcmin ({max_distance_arcmin} arcmin). Decrease nside_coverage."
-
     start_time = time.time()
-
-    # Ensure RA values are between 0 and 2pi.
-    # Every process loads the filament catalog in full.
-    # ra_filaments = np.radians(ridge_catalog.ra) % (2 * np.pi)
-    # dec_filaments = np.radians(ridge_catalog.dec)
-    # labels = ridge_catalog.ridge_id
 
     # The source catalog is split among the different processes.
     # The should have been done already when loading in the first place,
@@ -116,31 +98,24 @@ def measure_shear(
     bin_counts = np.zeros(num_bins)
     rank = comm.rank if comm is not None else 0
 
-    # from sklearn docs:
-    # Note that the haversine distance metric requires data in the form of [latitude, longitude]
-    # and both inputs and outputs are in units of radians.
-    # check units are in degrees
-    # assert ra_filaments.max() < 3 * np.pi, "Filament RA values should be in radians {}".format(ra_filaments.max())
-    # assert ra_background.max() < 3 * np.pi, "Background RA values should be in radians {}".format(ra_background.max())
-
-    # Pre-split the catalog into a low-resolution map, so that we can just look up pixels
-    # that are relatively close to the filament points later.
-    # pixel_regions, ntotal = precompute_pixel_regions(
-    #     source_catalog,
-    #     nside_coverage,
-    #     flip_g1=flip_g1,
-    #     flip_g2=flip_g2,
-    # )
+    # Extract the source catalog columns that we will need
     source_phi = np.radians(source_catalog.ra)
     source_theta = np.pi/2 - np.radians(source_catalog.dec)
     source_g1 = source_catalog.g1
     source_g2 = source_catalog.g2
+
+    if flip_g1:
+        source_g1 *= -1
+
+    if flip_g2:
+        source_g2 *= -1
+
     source_weights = source_catalog.weight
     source_catalog.unload()
     ntotal = source_phi.size
 
+    # Build an object that lets us quickly find nearby points and their distances
     tree = HealpixTree(theta=source_theta, phi=source_phi, nside=nside_coverage)
-    # source_catalog.unload()
 
     # Angular bins for the shear measurement in radians.
     # We use a similar configuration to galaxy-galaxy lensing.
@@ -203,7 +178,6 @@ def measure_shear(
 
         if rank == 0:
             pbar.update(1)
-        # gc.collect()
 
     # Sum up the results from all processes, so the totals are correct
     sum_in_place(bin_sums_plus, comm)
