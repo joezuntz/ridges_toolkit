@@ -99,7 +99,7 @@ class HealpixTree:
     
     def query_radii(self, thetas, phis, radius):
         """
-        For each (theta, phi) wuery value, find all points within radius radians
+        For each (theta, phi) query value, find all points within radius radians
         of any of them, and get the index of the nearest query point and distance to it
         """
         nearby_pixels = set()
