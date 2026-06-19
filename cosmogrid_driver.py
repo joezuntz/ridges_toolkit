@@ -171,6 +171,7 @@ class ShearStep(AnalysisStep):
 
 
 def main(action):
+    from mpi4py.MPI import COMM_WORLD as comm
     if action == "ridges":
         step = RidgesStep()
     elif action == "segment":
@@ -180,7 +181,7 @@ def main(action):
     else:
         raise ValueError("Unknown action " + action)
     
-    step.main()
+    step.main(comm)
 
 
 
