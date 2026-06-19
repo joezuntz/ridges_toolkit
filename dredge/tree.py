@@ -106,12 +106,12 @@ class HealpixTree:
 
         Parameters
         ----------
-        theta: array
-            Co-latitudes of the points to query in radians
-        phi: float
-            Longitudes of the points to query in radians
-        radius:
-            Distance in radians of points to query
+        thetas: array-like
+            Co-latitudes of the query points in radians
+        phis: array-like
+            Longitudes of the query points in radians
+        radius: float
+            Search radius in radians
 
         Returns
         -------
@@ -121,11 +121,11 @@ class HealpixTree:
 
         distances: array float64 1D
             Distance from each indexed point in self.theta and self.phi to the nearest
-            point in thetas and phis. Samne size as `indices`
+            query point in thetas and phis. Same size as `indices`
 
         nearest_query_point: array int64 1D
             The index in the query thetas and phis of the nearest point to the indexed point
-            in the background self.thetas/self.thetas. Same size as `indices`
+            in the background self.theta/self.phi. Same size as `indices`
         """
         phis = np.array(phis)
         thetas = np.array(thetas)
