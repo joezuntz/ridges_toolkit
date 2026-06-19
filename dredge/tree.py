@@ -101,7 +101,34 @@ class HealpixTree:
         """
         For each (theta, phi) query value, find all points within radius radians
         of any of them, and get the index of the nearest query point and distance to it
+
+        The radius is in radians.
+
+        Parameters
+        ----------
+        theta: array
+            Co-latitudes of the points to query in radians
+        phi: float
+            Longitudes of the points to query in radians
+        radius:
+            Distance in radians of points to query
+
+        Returns
+        -------
+        indices: array int64 1D
+            Index of every point in the self.theta and self.phi arrays that is within
+            `radius` radians of any point in the thetas and phis arrays
+
+        distances: array float64 1D
+            Distance from each indexed point in self.theta and self.phi to the nearest
+            point in thetas and phis. Samne size as `indices`
+
+        nearest_query_point: array int64 1D
+            The index in the query thetas and phis of the nearest point to the indexed point
+            in the background self.thetas/self.thetas. Same size as `indices`
         """
+        phis = np.array(phis)
+        thetas = np.array(thetas)
         nearby_pixels = set()
         for theta, phi in zip(thetas, phis):
             pix = hp.query_disc(self.nside, hp.ang2vec(theta, phi), radius, inclusive=True)
@@ -150,7 +177,7 @@ def _multi_query_core(theta_queries, phi_queries, theta_bg, phi_bg, radius, near
     This internal function finds all points closer than radius
     to the query point.
 
-    Here the query points are assumed to be scalar and the backgrounds to be arrays.
+    Here the query points and backgrounds are are all assumed to be arrays.
     """
     output = np.empty(max_size, dtype=np.int64)
     output_idx = 0

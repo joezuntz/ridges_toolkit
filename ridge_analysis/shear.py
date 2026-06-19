@@ -1,9 +1,7 @@
 import numpy as np
 import time
-import healpy as hp
 from .io import ShearMeasurement, RidgeSegmentCatalog, SourceCatalog
 import numba
-from dredge.utils import haversine_distance
 from dredge.tree import HealpixTree
 
 
@@ -33,7 +31,6 @@ def measure_shear(
     max_distance_arcmin: float = 60.0,
     skip_end_points: bool = False,
     min_filament_points: int = 0,
-    neighbour_algorithm: str = "brute",
 ):
     """
     Measure the tangential shear in the source catalog around the ridges in the ridge catalog.
@@ -73,14 +70,7 @@ def measure_shear(
         Whether to skip pairs where the filament point is at the end of the filament. Default is False.
     min_filament_points : int
         The minimum number of points in a filament segment to include in the shear measurement. Default is 0 (i.e. include all filaments).
-    neighbour_algorithm : str
-        The algorithm to use for finding nearest neighbors when determining the nearest filament point to each source.
-        Must be one of 'auto', 'ball_tree', 'kd_tree', or 'brute'. Default is 'brute'.
     """
-    if neighbour_algorithm not in ["auto", "ball_tree", "kd_tree", "brute"]:
-        raise ValueError(
-            f"Invalid neighbour_algorithm: {neighbour_algorithm}. Must be one of 'auto', 'ball_tree', 'kd_tree', 'brute'."
-        )
 
     min_ang_rad = np.radians(min_distance_arcmin / 60)
     max_ang_rad = np.radians(max_distance_arcmin / 60)
@@ -166,7 +156,7 @@ def measure_shear(
 
         if skip_end_points:
             # optionally skip pairs where the filament point is at the end of the filament
-            valid_bins &= (indices > 0) & (indices < filament_ra.size - 1)
+            valid_bins &= (nearest_query_point > 0) & (nearest_query_point < filament_ra.size - 1)
 
         # Accumulate the total tangential and cross shear in each bin,
         # together with the counts, weights, and actual (as opposed to nominal) distances.
