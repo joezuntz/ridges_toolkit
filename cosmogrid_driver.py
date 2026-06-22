@@ -13,6 +13,22 @@ base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
 
+
+# Pairs where the source is behind the lens, as determined
+# from a signal-to-noise plot
+shear_source_lens_pairs_to_do = {
+    # (source, lens)
+    (1, 0),
+    (1, 1),
+    (2, 0),
+    (2, 1),
+    (2, 2),
+    (3, 0),
+    (3, 1),
+    (3, 2),
+    (3, 3),
+}
+
 dredge_config = dict(
     # not sure if this is enough.
     # will do a test run now with this to check speed
@@ -164,23 +180,18 @@ class ShearStep(AnalysisStep):
 
         if comm is None or comm.rank == 0:
             print("ADDING NOISE!!!!")
-            
 
-        source_bins = [0, 1, 2, 3]
-        lens_bins = [0, 1, 2, 3]
-
-        for b in lens_bins:
-            for s in source_bins:
-                config = {
-                    "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
-                    "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
-                    "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
-                    "seed": [base_seed, task_index, permutation, b, s],
-                }
-                if comm is None or comm.rank == 0:
-                    print(f"Running shear {cosmo_dir} lens bin {b} source bin {s}")
-                config = ridge_analysis.ShearConfig(**config, **shear_config)
-                ridge_analysis.measure_ridge_shear(config, comm=comm)
+        for (s, b) in shear_source_lens_pairs_to_do:
+            config = {
+                "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
+                "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
+                "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
+                "seed": [base_seed, task_index, permutation, b, s],
+            }
+            if comm is None or comm.rank == 0:
+                print(f"Running shear {cosmo_dir} lens bin {b} source bin {s}")
+            config = ridge_analysis.ShearConfig(**config, **shear_config)
+            ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
 
 
