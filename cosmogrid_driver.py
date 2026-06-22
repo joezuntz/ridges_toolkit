@@ -37,6 +37,7 @@ shear_config = dict(
     min_distance_arcmin=1.0,
     max_distance_arcmin=60.0,
     nside_coverage=128,
+    sigma_e=0.26,
 )
 
 class AnalysisStep:
@@ -152,6 +153,11 @@ class ShearStep(AnalysisStep):
         cosmo_dir = input_dir.removeprefix(self.input_base)
         cat_dir = os.path.join(self.catalog_base, cosmo_dir)
         nside = MAP_NSIDE
+        base_seed = 7876
+
+        if comm is None or comm.rank == 0:
+            print("ADDING NOISE!!!!")
+            
 
         source_bins = [0, 1, 2, 3]
         lens_bins = [0, 1, 2, 3]
@@ -163,8 +169,8 @@ class ShearStep(AnalysisStep):
                     "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
                     "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_lens_catalog_{nside}_{s}.hdf5",
                     "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
+                    "seed": [base_seed, task_index, permutation, b, s],
                 }
-            
                 config = ridge_analysis.ShearConfig(**config, **shear_config)
                 ridge_analysis.measure_ridge_shear(config, comm=comm)
                 

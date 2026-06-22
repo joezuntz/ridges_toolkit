@@ -181,6 +181,8 @@ def measure_ridge_shear(shear_config: ShearConfig, comm=None):
         max_distance_arcmin=shear_config.max_distance_arcmin,
         skip_end_points=shear_config.skip_end_points,
         min_filament_points=shear_config.min_filament_points,
+        add_sigma_e=shear_config.add_sigma_e,
+        seed=shear_config.seed,
     )
 
     if comm is None or comm.rank == 0:

@@ -31,6 +31,8 @@ def measure_shear(
     max_distance_arcmin: float = 60.0,
     skip_end_points: bool = False,
     min_filament_points: int = 0,
+    add_sigma_e: float = 0.0,
+    seed: int = 0,
 ):
     """
     Measure the tangential shear in the source catalog around the ridges in the ridge catalog.
@@ -70,6 +72,10 @@ def measure_shear(
         Whether to skip pairs where the filament point is at the end of the filament. Default is False.
     min_filament_points : int
         The minimum number of points in a filament segment to include in the shear measurement. Default is 0 (i.e. include all filaments).
+    add_sigma_e: float
+        Sigma e per component to add
+    seed: int
+        Random seed for adding sigma_e
     """
 
     min_ang_rad = np.radians(min_distance_arcmin / 60)
@@ -94,11 +100,17 @@ def measure_shear(
     source_g1 = source_catalog.g1
     source_g2 = source_catalog.g2
 
+    if add_sigma_e > 0:
+        rng = np.random.default_rng()
+        source_g1 += rng.normal(0, add_sigma_e, source_g1.size)
+        source_g2 += rng.normal(0, add_sigma_e, source_g2.size)
+
     if flip_g1:
         source_g1 *= -1
 
     if flip_g2:
         source_g2 *= -1
+
 
     source_weights = source_catalog.weight
     source_catalog.unload()
