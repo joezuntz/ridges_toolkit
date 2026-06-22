@@ -38,7 +38,7 @@ shear_config = dict(
     min_distance_arcmin=1.0,
     max_distance_arcmin=60.0,
     nside_coverage=128,
-    sigma_e=0.26,
+    add_sigma_e=0.26,
 )
 
 class AnalysisStep:
