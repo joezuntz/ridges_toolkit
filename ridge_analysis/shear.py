@@ -101,7 +101,9 @@ def measure_shear(
     source_g2 = source_catalog.g2
 
     if add_sigma_e > 0:
-        rng = np.random.default_rng()
+        if rank == 0:
+            print(f"Adding noise with sigma_e={add_sigma_e} and seed {seed} to shears")
+        rng = np.random.default_rng(seed)
         source_g1 += rng.normal(0, add_sigma_e, source_g1.size)
         source_g2 += rng.normal(0, add_sigma_e, source_g2.size)
 
