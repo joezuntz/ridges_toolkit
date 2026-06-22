@@ -420,6 +420,7 @@ def run_on_full_cosmogrid():
     # how many cosmologies to do
     log_failures = False
     max_n_cosmo = 2500
+    max_permutations = 1
 
     cosmo_dirs = cosmo_dirs[:max_n_cosmo]
 
@@ -431,7 +432,7 @@ def run_on_full_cosmogrid():
         failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
         failure_log = open(failure_log_filename, "w")
 
-    for permutation in range(20):
+    for permutation in range(max_permutations):
         perm_dir = f"perm_{permutation:04d}"
 
         for i, cosmo_dir in enumerate(cosmo_dirs):

@@ -14,6 +14,11 @@ base_shear_dir = os.path.join(base_dir, "shear")
 MAP_NSIDE = 1024
 ADD_NOISE = False
 
+num_groups = 1
+group = 0
+
+
+
 #Pairs where the source is behind the lens, as determined
 # from a signal-to-noise plot
 shear_lens_source_pairs_to_do = [
@@ -71,6 +76,9 @@ class AnalysisStep:
 
     def main(self, comm):
         cosmo_dirs = sorted(glob.glob("cosmo_*", root_dir=self.input_base))
+        # split the whole collection of cosmo_dirs
+        # among the different processes
+        cosmo_dirs = cosmo_dirs[group::num_groups]
         for perm in self.permutations:
             for i, cosmo_dir in enumerate(cosmo_dirs):
                 # Skip cosmologies that are the responsibility
@@ -212,7 +220,11 @@ def main(action):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("action", type=str, default="ridges", help="Action to perform: ridges, segment, shear")
+parser.add_argument("--group", type=int, default=0, help="Index if doing multiple runs")
+parser.add_argument("--num-groups", type=int, default=1, help="Num groups if doing multiple node runs")
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    group = args.group
+    num_groups = args.num_groups
     main(args.action)
