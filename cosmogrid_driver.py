@@ -12,22 +12,22 @@ base_ridge_segment_dir = os.path.join(base_dir, "segments")
 base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
+ADD_NOISE = False
 
-
-# Pairs where the source is behind the lens, as determined
+#Pairs where the source is behind the lens, as determined
 # from a signal-to-noise plot
-shear_source_lens_pairs_to_do = {
-    # (source, lens)
-    (1, 0),
+shear_lens_source_pairs_to_do = [
+    # (lens, source)
+    (0, 1),
+    (0, 2),
+    (0, 3),
     (1, 1),
-    (2, 0),
-    (2, 1),
+    (1, 2),
+    (1, 3),
     (2, 2),
-    (3, 0),
-    (3, 1),
-    (3, 2),
+    (2, 3),
     (3, 3),
-}
+]
 
 dredge_config = dict(
     # not sure if this is enough.
@@ -54,8 +54,9 @@ shear_config = dict(
     min_distance_arcmin=1.0,
     max_distance_arcmin=60.0,
     nside_coverage=128,
-    add_sigma_e=0.26,
 )
+if ADD_NOISE:
+    shear_config['add_sigma_e'] = 0.26
 
 class AnalysisStep:
     input_base = ""
@@ -172,24 +173,23 @@ class ShearStep(AnalysisStep):
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
         cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
-        print(cosmo_dir)
-        print(self.catalog_base)
+
         cat_dir = os.path.join(self.catalog_base, cosmo_dir)
         nside = MAP_NSIDE
         base_seed = 7876
 
-        if comm is None or comm.rank == 0:
-            print("ADDING NOISE!!!!")
+        if ADD_NOISE and ((comm is None) or (comm.rank == 0)):
+            print("ADDING NOISE!")
 
-        for (s, b) in shear_source_lens_pairs_to_do:
+        for (l, s) in shear_lens_source_pairs_to_do:
             config = {
-                "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
+                "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{l}.hdf5",
                 "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
-                "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
-                "seed": [base_seed, task_index, permutation, b, s],
+                "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{l}_source{s}.txt",
+                "seed": [base_seed, task_index, permutation, l, s],
             }
             if comm is None or comm.rank == 0:
-                print(f"Running shear {cosmo_dir} lens bin {b} source bin {s}")
+                print(f"Running shear {cosmo_dir} lens bin {l} source bin {s}")
             config = ridge_analysis.ShearConfig(**config, **shear_config)
             ridge_analysis.measure_ridge_shear(config, comm=comm)
                 

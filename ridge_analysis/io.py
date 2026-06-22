@@ -67,7 +67,10 @@ class Catalog:
 
             start = rank * rows
             slc = slice(start, start + my_rows)
-            print("Rank", rank, "loading rows", start, "to", start + my_rows)
+            if rank < 4:
+                print("Rank", rank, "loading rows", start, "to", start + my_rows)
+            if rank == 4:
+                print("Rank", rank, "loading rows", start, "to", start + my_rows, " ... rest of ranks not printed out")
         else:
             slc = slice(None)
 
