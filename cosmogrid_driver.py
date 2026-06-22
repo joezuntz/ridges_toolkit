@@ -5,10 +5,11 @@ import traceback
 from timeit import default_timer
 import argparse
 
-base_catalog_dir = "/pscratch/sd/z/zuntz/ridges/v1"
-base_ridge_point_dir = "/pscratch/sd/z/zuntz/ridges/v1-analysis1"
-base_ridge_segment_dir = "/pscratch/sd/z/zuntz/ridges/v1-segments1"
-base_shear_dir = "/pscratch/sd/z/zuntz/ridges/v1-shear1"
+base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
+base_catalog_dir = os.path.join(base_dir, "catalogs")
+base_ridge_point_dir = os.path.join(base_dir, "ridges")
+base_ridge_segment_dir = os.path.join(base_dir, "segments")
+base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
 
@@ -24,7 +25,7 @@ dredge_config = dict(
 
 segmentation_config = dict(
     # we probably want to investigate this
-    density_percentile=0.0,
+    density_percentile=15.0,
     mst_neighbours=10,
     do_spline=False,
     n_spline_points=100,
@@ -132,14 +133,18 @@ class SegmentationStep(AnalysisStep):
     def run(self, task_index, input_dir, output_dir, permutation, comm):
         bins = [0, 1, 2, 3]
         print("NOTE: USING DENSITY PERCENTILE: ", segmentation_config["density_percentile"])
-
+        print(f"Rank {comm.rank} doing {input_dir}->{output_dir}")
         for b in bins:
             config = {
                 "ridge_point_file": f"{input_dir}/perm_{permutation:04d}_ridge_points_{b}.hdf5",
                 "ridge_file": f"{output_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
             }
             config = ridge_analysis.SegmentationConfig(**config, **segmentation_config)
-            ridge_analysis.segment_ridges(config, comm=comm)
+            # we pass in comm=None here because when we are not doing
+            # any spline fitting this task is serial and we just want to do it
+            # at the embarassingly parallel level
+            ridge_analysis.segment_ridges(config, comm=None)
+            
 
 
 class ShearStep(AnalysisStep):
@@ -149,7 +154,9 @@ class ShearStep(AnalysisStep):
     uses_comm_internally = True
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
-        cosmo_dir = input_dir.removeprefix(self.input_base)
+        cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
+        print(cosmo_dir)
+        print(self.catalog_base)
         cat_dir = os.path.join(self.catalog_base, cosmo_dir)
         nside = MAP_NSIDE
 
@@ -159,18 +166,19 @@ class ShearStep(AnalysisStep):
         for b in lens_bins:
             for s in source_bins:
                 config = {
-                    # "lens_catalog_file": f"{input_dir}/perm_{permutation:04d}_lens_catalog_{nside}_{b}.hdf5",
                     "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
-                    "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_lens_catalog_{nside}_{s}.hdf5",
+                    "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
                     "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
                 }
-            
+                if comm is None or comm.rank == 0:
+                    print(f"Running shear {cosmo_dir} lens bin {b} source bin {s}")
                 config = ridge_analysis.ShearConfig(**config, **shear_config)
                 ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
 
 
 def main(action):
+    from mpi4py.MPI import COMM_WORLD as comm
     if action == "ridges":
         step = RidgesStep()
     elif action == "segment":
@@ -180,7 +188,7 @@ def main(action):
     else:
         raise ValueError("Unknown action " + action)
     
-    step.main()
+    step.main(comm)
 
 
 
