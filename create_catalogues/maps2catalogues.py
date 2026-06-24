@@ -407,8 +407,8 @@ def run_on_full_cosmogrid():
 
     # Basic input and output directories
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/grid"
-    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
-    gold_mask_filename = f"{output_base_dir}/desy3_gold_mask.npy"
+    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1/catalogs"
+    gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
 
     # Each different cosmology has its own directory.
