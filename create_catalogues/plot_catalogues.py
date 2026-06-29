@@ -102,7 +102,7 @@ def plot_shear_catalogue(catalogue, nside, title='', lon=[0,50], lat=[0,50], chu
 
 
 z_bin = 0
-resolution = 4096
+resolution = 1024
 plot_dg_catalogue(folder+'lens_catalog_'+str(resolution)+'_'+str(z_bin)+'.hdf5', nside=resolution, title=f'Galaxy catalogue (maglim), bin {z_bin}', save_name='_maglim_'+str(resolution), lon=[0,50], lat=[-40,10])
 
 print('plotting metacal galaxies...')
