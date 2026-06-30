@@ -82,20 +82,15 @@ def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmen
             ridge_point_catalog.apply_density_cut(segmentation_config.density_percentile)
 
         # Apply edge filter to remove points near survey boundaries
-        print("TODO EDGE FILTER!")
-
         ridges = ridge_point_catalog.dec_ra_in_radians()
 
         # The initial segmentation is very quick so we only do it on
         # rank 0 and then broadcast the results to the other ranks for
         # the optional spline interpolation step.
-        print("Building MST")
         mst = build_mst(ridges, k=segmentation_config.mst_neighbours)
-        print("Splitting MST into segments")
         branch_points = detect_branch_points(mst)
         filament_segments = split_mst_at_branches(mst, branch_points)
         # filament_segments is a list of graphs.
-        print("Clustering segments with DBSCAN")
         filament_labels = segment_filaments_with_dbscan(ridges, filament_segments)
         n_filament = len(filament_labels)
         #filament labels is now a list of indices.
