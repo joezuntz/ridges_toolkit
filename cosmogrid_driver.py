@@ -163,7 +163,6 @@ class SegmentationStep(AnalysisStep):
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
         bins = [0, 1, 2, 3]
-        print("NOTE: USING DENSITY PERCENTILE: ", segmentation_config["density_percentile"])
         print(f"Rank {comm.rank} doing {input_dir}->{output_dir}")
         for b in bins:
             config = {
@@ -175,6 +174,7 @@ class SegmentationStep(AnalysisStep):
             # any spline fitting this task is serial and we just want to do it
             # at the embarassingly parallel level
             ridge_analysis.segment_ridges(config, comm=None)
+            print(f"Rank {comm.rank} done bin {b}")
             
 
 
