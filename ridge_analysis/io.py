@@ -103,6 +103,11 @@ class Catalog:
         self.data = {}
         self.loaded = False
         gc.collect()
+    
+    def cut(self, mask):
+        for col, data in list(self.data.items()):
+            self.data[col] = data[mask]
+
 
     def cut_to_redshift_range(self, zmin, zmax):
         if "z" not in self.data:

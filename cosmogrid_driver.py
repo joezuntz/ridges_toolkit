@@ -14,6 +14,11 @@ base_shear_dir = os.path.join(base_dir, "shear")
 MAP_NSIDE = 1024
 ADD_NOISE = False
 
+# The way I have installed mpi will not work on NERSC unless
+# you are running all on the same node.  If we want to run on
+# multiple nodes at the same time we need to manually mess with
+# things and let the user set up the assigments on the command line.
+# These numbers are those assignments
 num_groups = 1
 group = 0
 

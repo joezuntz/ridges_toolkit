@@ -6,5 +6,6 @@ from .main import (
     ShearConfig,
     measure_ridge_shear,
     SourceCatalog,
+    LensCatalog,
     ShearConfig,
 )
