@@ -408,8 +408,8 @@ def run_on_full_cosmogrid():
 
     # Basic input and output directories
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/grid"
-    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
-    gold_mask_filename = f"{output_base_dir}/desy3_gold_mask.npy"
+    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1/catalogs"
+    gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
 
     # Each different cosmology has its own directory.
@@ -421,6 +421,7 @@ def run_on_full_cosmogrid():
     # how many cosmologies to do
     log_failures = False
     max_n_cosmo = 2500
+    max_permutations = 1
 
     cosmo_dirs = cosmo_dirs[:max_n_cosmo]
 
@@ -432,7 +433,7 @@ def run_on_full_cosmogrid():
         failure_log_filename = f"{output_base_dir}/v1_fails.{rank}.log"
         failure_log = open(failure_log_filename, "w")
 
-    for permutation in range(20):
+    for permutation in range(max_permutations):
         perm_dir = f"perm_{permutation:04d}"
 
         for i, cosmo_dir in enumerate(cosmo_dirs):

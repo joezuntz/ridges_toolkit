@@ -12,6 +12,32 @@ base_ridge_segment_dir = os.path.join(base_dir, "segments")
 base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
+ADD_NOISE = False
+
+# The way I have installed mpi will not work on NERSC unless
+# you are running all on the same node.  If we want to run on
+# multiple nodes at the same time we need to manually mess with
+# things and let the user set up the assigments on the command line.
+# These numbers are those assignments
+num_groups = 1
+group = 0
+
+
+
+#Pairs where the source is behind the lens, as determined
+# from a signal-to-noise plot
+shear_lens_source_pairs_to_do = [
+    # (lens, source)
+    (0, 1),
+    (0, 2),
+    (0, 3),
+    (1, 1),
+    (1, 2),
+    (1, 3),
+    (2, 2),
+    (2, 3),
+    (3, 3),
+]
 
 dredge_config = dict(
     # not sure if this is enough.
@@ -39,6 +65,8 @@ shear_config = dict(
     max_distance_arcmin=60.0,
     nside_coverage=128,
 )
+if ADD_NOISE:
+    shear_config['add_sigma_e'] = 0.26
 
 class AnalysisStep:
     input_base = ""
@@ -53,6 +81,9 @@ class AnalysisStep:
 
     def main(self, comm):
         cosmo_dirs = sorted(glob.glob("cosmo_*", root_dir=self.input_base))
+        # split the whole collection of cosmo_dirs
+        # among the different processes
+        cosmo_dirs = cosmo_dirs[group::num_groups]
         for perm in self.permutations:
             for i, cosmo_dir in enumerate(cosmo_dirs):
                 # Skip cosmologies that are the responsibility
@@ -132,7 +163,6 @@ class SegmentationStep(AnalysisStep):
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
         bins = [0, 1, 2, 3]
-        print("NOTE: USING DENSITY PERCENTILE: ", segmentation_config["density_percentile"])
         print(f"Rank {comm.rank} doing {input_dir}->{output_dir}")
         for b in bins:
             config = {
@@ -144,6 +174,7 @@ class SegmentationStep(AnalysisStep):
             # any spline fitting this task is serial and we just want to do it
             # at the embarassingly parallel level
             ridge_analysis.segment_ridges(config, comm=None)
+            print(f"Rank {comm.rank} done bin {b}")
             
 
 
@@ -155,25 +186,25 @@ class ShearStep(AnalysisStep):
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
         cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
-        print(cosmo_dir)
-        print(self.catalog_base)
+
         cat_dir = os.path.join(self.catalog_base, cosmo_dir)
         nside = MAP_NSIDE
+        base_seed = 7876
 
-        source_bins = [0, 1, 2, 3]
-        lens_bins = [0, 1, 2, 3]
+        if ADD_NOISE and ((comm is None) or (comm.rank == 0)):
+            print("ADDING NOISE!")
 
-        for b in lens_bins:
-            for s in source_bins:
-                config = {
-                    "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{b}.hdf5",
-                    "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
-                    "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{b}_source{s}.txt",
-                }
-                if comm is None or comm.rank == 0:
-                    print(f"Running shear {cosmo_dir} lens bin {b} source bin {s}")
-                config = ridge_analysis.ShearConfig(**config, **shear_config)
-                ridge_analysis.measure_ridge_shear(config, comm=comm)
+        for (l, s) in shear_lens_source_pairs_to_do:
+            config = {
+                "ridge_file": f"{input_dir}/perm_{permutation:04d}_ridges_{l}.hdf5",
+                "source_catalog_file": f"{cat_dir}/perm_{permutation:04d}_source_catalog_{nside}_{s}.hdf5",
+                "output_shear_file": f"{output_dir}/perm_{permutation:04d}_shear_lens{l}_source{s}.txt",
+                "seed": [base_seed, task_index, permutation, l, s],
+            }
+            if comm is None or comm.rank == 0:
+                print(f"Running shear {cosmo_dir} lens bin {l} source bin {s}")
+            config = ridge_analysis.ShearConfig(**config, **shear_config)
+            ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
 
 
@@ -194,7 +225,11 @@ def main(action):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("action", type=str, default="ridges", help="Action to perform: ridges, segment, shear")
+parser.add_argument("--group", type=int, default=0, help="Index if doing multiple runs")
+parser.add_argument("--num-groups", type=int, default=1, help="Num groups if doing multiple node runs")
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    group = args.group
+    num_groups = args.num_groups
     main(args.action)

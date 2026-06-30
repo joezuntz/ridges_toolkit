@@ -67,7 +67,10 @@ class Catalog:
 
             start = rank * rows
             slc = slice(start, start + my_rows)
-            print("Rank", rank, "loading rows", start, "to", start + my_rows)
+            if rank < 4:
+                print("Rank", rank, "loading rows", start, "to", start + my_rows)
+            if rank == 4:
+                print("Rank", rank, "loading rows", start, "to", start + my_rows, " ... rest of ranks not printed out")
         else:
             slc = slice(None)
 
@@ -100,6 +103,11 @@ class Catalog:
         self.data = {}
         self.loaded = False
         gc.collect()
+    
+    def cut(self, mask):
+        for col, data in list(self.data.items()):
+            self.data[col] = data[mask]
+
 
     def cut_to_redshift_range(self, zmin, zmax):
         if "z" not in self.data:

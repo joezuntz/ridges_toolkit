@@ -88,6 +88,8 @@ class ShearConfig:
     skip_end_points: bool = False
     source_zmin: float = 0.0
     source_zmax: float = 100.0
+    add_sigma_e: float = 0.0
+    seed: int = 0,
 
     help = {
         "output_shear_file": "Path to the output shear file (text format)",
@@ -103,4 +105,5 @@ class ShearConfig:
         "skip_end_points": "Whether to skip the end points of filaments in the shear measurement (not functional).",
         "source_zmin": "Minimum redshift of source galaxies to consider (not functional).",
         "source_zmax": "Maximum redshift of source galaxies to consider (not functional).",
+        "add_sigma_e": "sigma_e value to add to shears"
     }
