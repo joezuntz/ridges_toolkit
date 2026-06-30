@@ -102,11 +102,8 @@ def plot_shear_catalogue(catalogue, nside, title='', lon=[0,50], lat=[0,50], chu
 
 
 z_bin = 0
-resolution = 4096
+resolution = 1024
 plot_dg_catalogue(folder+'lens_catalog_'+str(resolution)+'_'+str(z_bin)+'.hdf5', nside=resolution, title=f'Galaxy catalogue (maglim), bin {z_bin}', save_name='_maglim_'+str(resolution), lon=[0,50], lat=[-40,10])
-
-print('plotting metacal galaxies...')
-plot_dg_catalogue(folder+'dg_metacal_catalogue.hdf5', nside=resolution, title=f'Galaxy catalogue (metacal), bin 5', save_name='_metacal_'+str(resolution), lon=[0,50], lat=[-40,10])
 
 print('plotting reconstructed shear maps...')
 plot_shear_catalogue(folder+'source_catalog_'+str(resolution)+'_'+str(z_bin)+'.hdf5', nside=resolution, title='Reconstructed shear1 map - bin'+str(z_bin), save_name='_'+str(resolution), lon=[-5,55], lat=[-45,15])

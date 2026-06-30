@@ -193,7 +193,8 @@ def kappa2gamma_lm_map(kappa_lm, lmax):
     gamma_lm : array
         Spherical harmonic coefficients of the shear map
     '''
-    ell = np.linspace(0, lmax, len(kappa_lm))
+    ell = hp.Alm.getlm(lmax, np.arange(len(kappa_lm)))[0] 
+    ell = ell.astype(float)
 
     factor = np.zeros_like(ell)
 
