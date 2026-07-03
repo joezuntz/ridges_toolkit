@@ -257,7 +257,7 @@ def write_shear_catalogue_from_dg_catalogue(gamma1_map, gamma2_map, h5filename, 
             current_size += gamma1_chunk.size
 
 
-def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask, bin_i, path_to_files=''):
+def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask, bin_i, path_to_files='', do_density=True):
     '''
     Convert density and convergence maps into galaxy catalogues using Poisson sampling.
     Parameters
@@ -276,28 +276,29 @@ def maps2catalogues(cosmogrid_filename, filenames, n_g_maglim, n_g_metacal, mask
     '''
     f = h5py.File(cosmogrid_filename, 'r')
 
-    # Load overdensity maps from CosmoGrid
-    maglim_dg_map = f['map']['dg'][f"maglim{bin_i + 1}"][:]
+    if do_density:
+        # Load overdensity maps from CosmoGrid
+        maglim_dg_map = f['map']['dg'][f"maglim{bin_i + 1}"][:]
 
-    # Regrade maps to desired resolution (if needed)
-    maglim_dg_map = hp.ud_grade(maglim_dg_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
+        # Regrade maps to desired resolution (if needed)
+        maglim_dg_map = hp.ud_grade(maglim_dg_map, nside_out=SIM_NSIDE, order_in='RING', order_out='RING')
 
-    dg_cat_maglim_hd5 = f"{path_to_files}{filenames['lens']}"
+        dg_cat_maglim_hd5 = f"{path_to_files}{filenames['lens']}"
 
-    # Make the lens density catalogue.
-    # We don't need a separate density catalogue for the source sample
-    # because the gamma map below already contains that information
-    # and it would just be a duplicate.
-    log('Making maglim catalogue...')
-    write_dg_catalogue_from_map(delta_g=maglim_dg_map,
-                                number_density=n_g_maglim[bin_i],
-                                mask=mask,
-                                h5filename=dg_cat_maglim_hd5
-                                )
+        # Make the lens density catalogue.
+        # We don't need a separate density catalogue for the source sample
+        # because the gamma map below already contains that information
+        # and it would just be a duplicate.
+        log('Making maglim catalogue...')
+        write_dg_catalogue_from_map(delta_g=maglim_dg_map,
+                                    number_density=n_g_maglim[bin_i],
+                                    mask=mask,
+                                    h5filename=dg_cat_maglim_hd5
+                                    )
 
-    # Delete maps (free up memory)
-    del maglim_dg_map
-    gc.collect()
+        # Delete maps (free up memory)
+        del maglim_dg_map
+        gc.collect()
     log("Making shear catalogue...")
 
     metacal_dg_map = f['map']['dg'][f"metacal{bin_i + 1}"][:]
@@ -363,7 +364,7 @@ def load_mask(gold_mask_filename):
     return mask, mask_low_res
 
 
-def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
+def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix="", do_density=True):
 
     n_g_metacal = np.array([1.476, 1.479, 1.484, 1.461])
     n_g_maglim = np.array([0.150, 0.107, 0.109, 0.146])
@@ -388,7 +389,8 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix=""):
             n_g_maglim=n_g_maglim,
             mask=(mask, mask_low_res),
             bin_i=i,
-            path_to_files=output_dir
+            path_to_files=output_dir,
+            do_density=do_density,
         )    
         log(f'Done with bin {i+1}')
 
@@ -400,6 +402,8 @@ def run_on_full_cosmogrid():
     # suppress printing in the rest of the code
     global VERBOSE
     VERBOSE = False
+    # temporary!
+    do_density = False
 
     # set up MPI processors
     from mpi4py.MPI import COMM_WORLD as comm
@@ -408,7 +412,7 @@ def run_on_full_cosmogrid():
 
     # Basic input and output directories
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/grid"
-    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v1/catalogs"
+    output_base_dir = "/pscratch/sd/z/zuntz/ridges/v2/catalogs"
     gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
 
@@ -458,7 +462,7 @@ def run_on_full_cosmogrid():
 
             # Try running the main function, but if something goes wrong, log it to the file
             try:
-                main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix)
+                main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix, do_density=do_density)
                 # when all has completed, add a marker file to the output dir
                 # so we know this permutation is done
                 open(marker_file, "w").close()
