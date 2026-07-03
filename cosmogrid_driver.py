@@ -84,6 +84,9 @@ class AnalysisStep:
         # split the whole collection of cosmo_dirs
         # among the different processes
         cosmo_dirs = cosmo_dirs[group::num_groups]
+        n_dirs = len(cosmo_dirs)
+        if comm is None or comm.rank == 0:
+            print(f"Group {group+1}/{num_groups} processing {n_dirs} cosmologies")
         for perm in self.permutations:
             for i, cosmo_dir in enumerate(cosmo_dirs):
                 # Skip cosmologies that are the responsibility
