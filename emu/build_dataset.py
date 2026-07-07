@@ -9,8 +9,18 @@ import json
 import tqdm
 import numpy as np
 
+
+def write_dataset(file_path, cosmology, g_plus_data, g_cross_data):
+    with h5py.File(file_path, 'w') as f:
+        f.create_dataset('cosmology', data=cosmology)
+        f.create_dataset('sep_bin_center', data=radius)
+        for (l, s) in shear_lens_source_pairs_to_do:
+            f.create_dataset(f'g_plus/lens_{l}_source_{s}', data=g_plus_data[:, l, s, :])
+            f.create_dataset(f'g_cross/lens_{l}_source_{s}', data=g_cross_data[:, l, s, :])
+
+
 # import fiducial dataset
-metainfo_file = 'emu/CosmoGridV1_metainfo.h5'
+metainfo_file = 'emu/data/CosmoGridV1_metainfo.h5'
 metainfo = h5py.File(metainfo_file, 'r')
 
 fiducials_dataset = metainfo['parameters/grid']
@@ -50,8 +60,8 @@ g_cross_arr = np.zeros((nsims,
                         radial_bins))
 
 # remove dataset.hdf5 file if already exists
-if os.path.exists('emu/dataset.hdf5'):
-    os.remove('emu/dataset.hdf5')
+if os.path.exists('emu/data/dataset.hdf5'):
+    os.remove('emu/data/dataset.hdf5')
 
 loop_count = 0
 radius_saved = False
@@ -84,18 +94,21 @@ for sim_folder in tqdm.tqdm(sim_folders, total=min(len(sim_folders), nsims), des
         loop_count += 1
         # update values if key already exists in metadata.js metadata = {} only once
         if not radius_saved:
-            ### FINISH ME!
+            with open('emu/data/metadata.json', 'r') as f:
+                metadata = json.load(f)
+            metadata['sep_bin_center'] = radius.tolist()
             radius_saved = True
 
 
-# save arrays to dataset.hdf5
-with h5py.File('emu/dataset.hdf5', 'w') as f:
-    f.create_dataset('cosmology', data=param_values_arr)
-    f.create_dataset('sep_bin_center', data=radius)
-    # split bins into lens-source pairs and store g+ and gx signals
-    for l in range(lens_bins):
-        for s in range(source_bins):
-            if (l, s) not in shear_lens_source_pairs_to_do:
-                continue
-            f.create_dataset(f'g_plus/lens_{l}_source_{s}', data=g_plus_arr[:, l, s, :])
-            f.create_dataset(f'g_cross/lens_{l}_source_{s}', data=g_cross_arr[:, l, s, :])
+# shuffle the dataset to randomise the order of simulations
+indices = np.arange(nsims)
+np.random.shuffle(indices)
+param_values_arr = param_values_arr[indices]
+g_plus_arr = g_plus_arr[indices]
+g_cross_arr = g_cross_arr[indices]
+
+# save some simulations for testing the emulator
+n_tests = 50
+
+write_dataset('emu/data/test_dataset.hdf5', param_values_arr[:n_tests], g_plus_arr[:n_tests], g_cross_arr[:n_tests])
+write_dataset('emu/data/dataset.hdf5', param_values_arr[n_tests:], g_plus_arr[n_tests:], g_cross_arr[n_tests:])
