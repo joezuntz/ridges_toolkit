@@ -46,4 +46,6 @@ plot_prediction.plot_prediction_frac_error(xarr=sep_bin_center,
                                            xlabel=r'$\theta$',
                                            ylabel=r'$\gamma_+$',
                                            legend=['test1', 'test2'],
-                                           title=f'Test - Lens bin {lens_bin}, source bin {source_bin}')
+                                           title=f'Test - Lens bin {lens_bin}, source bin {source_bin}',
+                                           save=True,
+                                           savename='test_l0s3')

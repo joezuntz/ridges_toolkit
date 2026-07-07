@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_err, idx1=0, idx2=None, legend=[], xlabel='', ylabel='', title='', fontsize=13):
+def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_err, idx1=0, idx2=None, legend=[], xlabel='', ylabel='', title='', fontsize=13, save=False, savename=''):
     f, (ax0, ax1) = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
 
     ax0.plot(xarr, true_signal[idx1], linestyle='solid', linewidth=2, color="#87dec4ff", label=legend[0])
@@ -28,5 +28,8 @@ def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_e
 
     f.suptitle(title, fontsize=fontsize+2)
     f.tight_layout()
-    plt.show()
+    if save:
+        plt.savefig('emu/figs/'+savename+'.png')
+    else:
+        plt.show()
 
