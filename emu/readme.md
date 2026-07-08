@@ -1,5 +1,5 @@
 # Emulator
-Emulator for tangential shear prediction from ridges. **atm works for one bin pair only**
+Emulator for tangential shear prediction from ridges. 
 A few examples can be found in `notebooks/`.
 
 
@@ -15,4 +15,6 @@ A few examples can be found in `notebooks/`.
 
 ### How to use
 **work in progress, a few things needs to be changed.**
-
+1) Run `build_dataset.py` once
+2) Run `train.py` once -- this saves the models, so no need to re-run unless you change the dataset by re-running `build_dataset.py`
+3) Run `notebook/prediction.py` for an example (this will be turned into a notebook with comments and instructions)
