@@ -15,13 +15,8 @@ def load_dataset(lens_bin, source_bin):
     Load cosmology and signal from dataset.hdf5
     '''
     with h5py.File('emu/data/dataset.hdf5') as f:
-        print(f.visit(print))
         X = f["cosmology"][:]
         Y = f["g_plus/lens_"+str(lens_bin)+"_source_"+str(source_bin)][:]
-        # print shape of loaded arrays
-        print(f"Loaded X shape: {X.shape}")
-        print(f"Loaded Y shape: {Y.shape}")
-    return X, Y
 
 
 def split_dataset(X, Y):

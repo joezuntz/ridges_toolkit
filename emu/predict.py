@@ -18,13 +18,10 @@ def make_prediction(model_path, cosmology, lens_bin, source_bin):
     X_std = np.array(metadata[f'X_std_l{lens_bin}s{source_bin}'])
     Y_mean = np.array(metadata[f'Y_mean_l{lens_bin}s{source_bin}'])
     Y_std = np.array(metadata[f'Y_std_l{lens_bin}s{source_bin}'])
-    print('ststs:', Y_mean.shape, Y_std.shape)
-    print(cosmology.shape)
     
     cosmology = load_data.standardise_data(cosmology, X_mean, X_std)
 
     # load trained model.keras from file 
-    print('MODEL:', model_path)
     model = keras.models.load_model(model_path)
 
     # make prediction 
