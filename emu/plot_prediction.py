@@ -1,8 +1,31 @@
 import matplotlib.pyplot as plt
+from matplotlib import rc
+
+rc('text', usetex=True)
+rc('font',**{'family':'serif','serif':['Times']})
+
+def plot_prediction_frac_error(xarr, 
+                               predicted_signal, 
+                               true_signal, 
+                               fractional_err, 
+                               idx1=0, idx2=None, 
+                               legend=None, 
+                               xlabel='', ylabel='', 
+                               title='', 
+                               fontsize=13, 
+                               save=False, 
+                               savename='', 
+                               ax0=None, ax1=None):
+    if legend is None:
+        legend = []
 
 
-def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_err, idx1=0, idx2=None, legend=[], xlabel='', ylabel='', title='', fontsize=13, save=False, savename=''):
-    f, (ax0, ax1) = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
+    created_figure = False
+    if ax0 is None or ax1 is None:
+        f, (ax0, ax1) = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
+        created_figure = True
+    else:
+        f = ax0.figure
 
     ax0.plot(xarr, true_signal[idx1], linestyle='solid', linewidth=2, color="#87dec4ff", label=legend[0])
     ax0.plot(xarr, predicted_signal[idx1], linestyle='dashed', linewidth=2, color="#15664eff")
@@ -14,6 +37,11 @@ def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_e
     ax0.set_ylabel(ylabel, fontsize=fontsize)
     ax0.tick_params(axis='both', which='major', labelsize=fontsize)
     ax0.legend(title='True signal', fontsize=fontsize, title_fontsize=fontsize)
+    if title:
+        if created_figure:
+            f.suptitle(title, fontsize=fontsize+2)
+        else:
+            ax0.set_title(title, fontsize=fontsize+2)
 
     ax1.axhline(0, linestyle='dashed', color='black', linewidth=1)
     ax1.plot(xarr, fractional_err[idx1], linestyle='solid', linewidth=2, color="#15664eff", label='fractional error')
@@ -26,10 +54,10 @@ def plot_prediction_frac_error(xarr, predicted_signal, true_signal, fractional_e
     ax1.tick_params(axis='both', which='major', labelsize=fontsize) 
     ax1.set_ylim(-0.1, 0.1)
 
-    f.suptitle(title, fontsize=fontsize+2)
     f.tight_layout()
     if save:
-        plt.savefig('emu/figs/'+savename+'.png')
-    else:
+        plt.savefig('emu/figs/'+savename)
+    elif created_figure:
         plt.show()
 
+    return f, (ax0, ax1)

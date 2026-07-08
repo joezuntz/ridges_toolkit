@@ -9,14 +9,13 @@ import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-# get flder of this file
-FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def load_dataset(source_bin, lens_bin):
+def load_dataset(lens_bin, source_bin):
     '''
     Load cosmology and signal from dataset.hdf5
     '''
     with h5py.File('emu/data/dataset.hdf5') as f:
+        print(f.visit(print))
         X = f["cosmology"][:]
         Y = f["g_plus/lens_"+str(lens_bin)+"_source_"+str(source_bin)][:]
         # print shape of loaded arrays
@@ -33,7 +32,7 @@ def split_dataset(X, Y):
     return X_train, X_validate, Y_train, Y_validate
 
 
-def compute_and_save_mean_std(X_train, Y_train):
+def compute_and_save_mean_std(X_train, Y_train, lens_bin, source_bin):
     '''
     Get mean and standard deviation of training set for standardisation and save to metadata.js
     '''
@@ -45,10 +44,10 @@ def compute_and_save_mean_std(X_train, Y_train):
     # save mean and std to metadata.js
     with open('emu/data/metadata.json', 'r') as f:
         metadata = json.load(f)
-    metadata['X_mean'] = X_mean.tolist()
-    metadata['X_std'] = X_std.tolist()
-    metadata['Y_mean'] = Y_mean.tolist()
-    metadata['Y_std'] = Y_std.tolist()
+    metadata[f'X_mean_l{lens_bin}s{source_bin}'] = X_mean.tolist()
+    metadata[f'X_std_l{lens_bin}s{source_bin}'] = X_std.tolist()
+    metadata[f'Y_mean_l{lens_bin}s{source_bin}'] = Y_mean.tolist()
+    metadata[f'Y_std_l{lens_bin}s{source_bin}'] = Y_std.tolist()
     with open('emu/data/metadata.json', 'w') as f:
         json.dump(metadata, f, indent=4)
 
@@ -81,15 +80,15 @@ def de_standardise_data(norm_data, mean_train, std_train):
     return data
 
 
-def process_data(source_bin, lens_bin):
+def process_data(lens_bin, source_bin):
     '''
     Load dataset, split into training, validation and test sets, and standardise the data.
-    For a single bin pair (source_bin, lens_bin).
+    For a single bin pair (lens_bin, source_bin).
     '''
-    X, Y = load_dataset(source_bin, lens_bin) 
+    X, Y = load_dataset(lens_bin, source_bin) 
 
     X_train, X_validate, Y_train, Y_validate = split_dataset(X, Y)
-    X_mean, X_std, Y_mean, Y_std = compute_and_save_mean_std(X_train, Y_train)
+    X_mean, X_std, Y_mean, Y_std = compute_and_save_mean_std(X_train, Y_train, lens_bin, source_bin)
 
     X_train = standardise_data(X_train, X_mean, X_std)
     X_validate = standardise_data(X_validate, X_mean, X_std)

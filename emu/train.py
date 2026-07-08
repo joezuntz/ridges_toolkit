@@ -3,16 +3,19 @@
 # ---------------------- #
 
 import model 
-
 import load_data
+
+import tensorflow as tf
+import json
 import os
 
+METADATA = "emu/data/metadata.json"
 
-def train_emulator(source_bin, lens_bin):    
-    X_train, X_validate, Y_train, Y_validate = load_data.process_data(source_bin, lens_bin)
+def train_emulator(lens_bin, source_bin):    
+    X_train, X_validate, Y_train, Y_validate = load_data.process_data(lens_bin, source_bin)
     
+    # tf.keras.backend.clear_session()
     nn_model = model.build_model(n_in=X_train.shape[1], n_out=Y_train.shape[1], n_nodes=128, learning_rate=5e-5)
-    
     history = nn_model.fit(X_train, Y_train,
                         validation_data = (X_validate, Y_validate),
                         epochs=50, 
@@ -20,11 +23,21 @@ def train_emulator(source_bin, lens_bin):
                         )
     # save the model (create emu/models directory if it doesn't exist)
     os.makedirs('emu/models', exist_ok=True)
-    nn_model.save('emu/models/source'+str(source_bin)+'_lens'+str(lens_bin)+'.keras')
+    nn_model.save('emu/models/lens'+str(lens_bin)+'_source'+str(source_bin)+'.keras')
     return history
 
+
+def train_all_bin_pairs(metadata_file):
+    with open(metadata_file, "r") as f:
+        metadata = json.load(f)
+    all_pairs = metadata["bin_pairs"]
+    for (l,s) in all_pairs:
+        print("TRAINING PAIR:", (l, s))
+        train_emulator(l, s)
+
+
 def main():
-    train_emulator(source_bin=3, lens_bin=0)
+    train_all_bin_pairs(METADATA)
 
 if __name__ == "__main__":
     main()

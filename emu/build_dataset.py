@@ -33,22 +33,30 @@ nsims = 2500
 radial_bins = 20
 source_bins = 4
 lens_bins = 4
+# save some simulations for testing the emulator
+n_tests = 50
 
 # Pairs where the source is behind the lens, as determined
-# from a signal-to-noise plot
+# from a signal-to-noise plot. Save them into metadata.json
 shear_lens_source_pairs_to_do = [
     # (lens, source)
-    # (0, 1),
-    # (0, 2),
+    (0, 1),
+    (0, 2),
     (0, 3),
-    # (1, 1),
-    # (1, 2),
-    # (1, 3),
-    # (2, 2),
-    # (2, 3),
-    # (3, 3),
+    (1, 1),
+    (1, 2),
+    (1, 3),
+    (2, 2),
+    (2, 3),
+    (3, 3),
 ]
-
+with open('emu/data/metadata.json', 'r') as f:
+    metadata = json.load(f)
+metadata["bin_pairs"] = shear_lens_source_pairs_to_do
+with open('emu/data/metadata.json', 'w') as f:
+        json.dump(metadata, f, indent=4)
+        
+# create empty arrays to store signal and parameters
 param_values_arr = np.zeros((nsims, len(param_names)))
 g_plus_arr = np.zeros((nsims,
                        lens_bins,
@@ -68,7 +76,6 @@ radius_saved = False
 
 sim_folders = sorted(Path(shear_folder).glob("cosmo_*"))
 for sim_folder in tqdm.tqdm(sim_folders, total=min(len(sim_folders), nsims), desc='Building dataset'):
-# for sim_folder in sorted(Path(shear_folder).glob("cosmo_*")):
     # extract sim_id from folder name (sim ids not continuous)
     sim_id_str = sim_folder.name.replace('cosmo_', '')
     sim_id = int(sim_id_str) - 1
@@ -106,9 +113,6 @@ np.random.shuffle(indices)
 param_values_arr = param_values_arr[indices]
 g_plus_arr = g_plus_arr[indices]
 g_cross_arr = g_cross_arr[indices]
-
-# save some simulations for testing the emulator
-n_tests = 50
 
 write_dataset('emu/data/test_dataset.hdf5', param_values_arr[:n_tests], g_plus_arr[:n_tests], g_cross_arr[:n_tests])
 write_dataset('emu/data/dataset.hdf5', param_values_arr[n_tests:], g_plus_arr[n_tests:], g_cross_arr[n_tests:])

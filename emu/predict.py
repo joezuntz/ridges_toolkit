@@ -9,15 +9,15 @@ import numpy as np
 import load_data
 
 
-def make_prediction(model_path, cosmology):
+def make_prediction(model_path, cosmology, lens_bin, source_bin):
 
     # get mean and std from metadata
     with open('emu/data/metadata.json', 'r') as f:
         metadata = json.load(f)
-    X_mean = np.array(metadata['X_mean'])
-    X_std = np.array(metadata['X_std'])
-    Y_mean = np.array(metadata['Y_mean'])
-    Y_std = np.array(metadata['Y_std'])
+    X_mean = np.array(metadata[f'X_mean_l{lens_bin}s{source_bin}'])
+    X_std = np.array(metadata[f'X_std_l{lens_bin}s{source_bin}'])
+    Y_mean = np.array(metadata[f'Y_mean_l{lens_bin}s{source_bin}'])
+    Y_std = np.array(metadata[f'Y_std_l{lens_bin}s{source_bin}'])
     print('ststs:', Y_mean.shape, Y_std.shape)
     print(cosmology.shape)
     
