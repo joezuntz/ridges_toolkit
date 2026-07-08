@@ -17,6 +17,7 @@ def load_dataset(lens_bin, source_bin):
     with h5py.File('emu/data/dataset.hdf5') as f:
         X = f["cosmology"][:]
         Y = f["g_plus/lens_"+str(lens_bin)+"_source_"+str(source_bin)][:]
+    return X, Y
 
 
 def split_dataset(X, Y):
