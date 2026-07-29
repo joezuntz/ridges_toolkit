@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from matplotlib import rc
 
-rc('text', usetex=True)
+rc('text', usetex=False)
 rc('font',**{'family':'serif','serif':['Times']})
 
 def plot_prediction_frac_error(xarr, 

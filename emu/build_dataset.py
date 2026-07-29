@@ -28,7 +28,14 @@ n_simulations = len(fiducials_dataset)
 # read only cosmological + baryonic parameters
 param_names = np.array(fiducials_dataset.dtype.names)[:14]
 
-shear_folder = 'v1-shear/shear/'
+# select the true underlying parameters only
+# other parameters are calculated from these, no needed for training
+underlying_varying_params = ['bary_Mc', 'bary_nu', 'H0', 'Ob', 'Om', 'ns', 's8', 'w0']
+# get indicies corresponding to these parameters in param_names
+param_indices = [np.where(param_names == p)[0][0] for p in underlying_varying_params]
+
+
+shear_folder = 'v2-shear/shear/'
 nsims = 2500
 radial_bins = 20
 source_bins = 4
@@ -110,7 +117,9 @@ for sim_folder in tqdm.tqdm(sim_folders, total=min(len(sim_folders), nsims), des
 # shuffle the dataset to randomise the order of simulations
 indices = np.arange(nsims)
 np.random.shuffle(indices)
+# save only parameters with varying values, and the corresponding shear signals
 param_values_arr = param_values_arr[indices]
+param_values_arr = param_values_arr[:, param_indices]
 g_plus_arr = g_plus_arr[indices]
 g_cross_arr = g_cross_arr[indices]
 
