@@ -5,7 +5,7 @@
 import model 
 import load_data
 
-import tensorflow as tf
+import pickle
 import json
 import os
 
@@ -23,7 +23,10 @@ def train_emulator(lens_bin, source_bin):
                         )
     # save the model (create emu/models directory if it doesn't exist)
     os.makedirs('emu/models', exist_ok=True)
-    nn_model.save('emu/models/lens'+str(lens_bin)+'_source'+str(source_bin)+'.keras')
+    suffix = str(lens_bin)+'_source'+str(source_bin)
+    nn_model.save('emu/models/lens'+suffix+'.keras')
+    with open('emu/models/traing_history'+suffix+'.pkl', 'wb') as file:
+            pickle.dump(history.history, file)
     return history
 
 
@@ -34,6 +37,7 @@ def train_all_bin_pairs(metadata_file):
     for (l,s) in all_pairs:
         print("TRAINING PAIR:", (l, s))
         train_emulator(l, s)
+
 
 
 def main():
