@@ -5,7 +5,7 @@ import traceback
 from timeit import default_timer
 import argparse
 
-base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
+base_dir = "/pscratch/sd/z/zuntz/ridges/v2"
 base_catalog_dir = os.path.join(base_dir, "catalogs")
 base_ridge_point_dir = os.path.join(base_dir, "ridges")
 base_ridge_segment_dir = os.path.join(base_dir, "segments")
