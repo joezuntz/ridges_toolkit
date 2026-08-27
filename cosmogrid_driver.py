@@ -245,6 +245,8 @@ def fiducial(action):
     else:
         raise ValueError("Unknown action " + action)
 
+    # this is used only for the random seeds:
+    task_index = 8778
     for permutation in range(32):
         step.run(task_index, input_dir, output_dir, permutation, comm)
 
