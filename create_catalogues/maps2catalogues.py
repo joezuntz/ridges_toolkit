@@ -406,7 +406,7 @@ def run_on_fiducial_cosmogrid():
     size = comm.size
 
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/fiducial/cosmo_fiducial"
-    output_base_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/catalogs"
+    output_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/catalogs"
     gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
     log_failures = False
@@ -433,7 +433,7 @@ def run_on_fiducial_cosmogrid():
         prefix = perm_dir + "_"
 
         # Try running the main function, but if something goes wrong, log it to the file
-        main(cosmogrid_file, gold_mask_filename, output_base_dir, prefix=prefix, do_density=do_density)
+        main(cosmogrid_file, gold_mask_filename, output_dir, prefix=prefix, do_density=do_density)
         # when all has completed, add a marker file to the output dir
         # so we know this permutation is done
         open(marker_file, "w").close()
