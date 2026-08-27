@@ -186,13 +186,18 @@ class ShearStep(AnalysisStep):
     output_base = base_shear_dir
     catalog_base = base_catalog_dir
     uses_comm_internally = True
+    cat_dir = None
+    base_seed = 7876
+
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
-        cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
-
-        cat_dir = os.path.join(self.catalog_base, cosmo_dir)
+        if self.cat_dir is None:
+            cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
+            cat_dir = os.path.join(self.catalog_base, cosmo_dir)
+        else:
+            cat_dir = self.cat_dir
         nside = MAP_NSIDE
-        base_seed = 7876
+        base_seed = self.base_seed
 
         if ADD_NOISE and ((comm is None) or (comm.rank == 0)):
             print("ADDING NOISE!")
@@ -205,7 +210,7 @@ class ShearStep(AnalysisStep):
                 "seed": [base_seed, task_index, permutation, l, s],
             }
             if comm is None or comm.rank == 0:
-                print(f"Running shear {cosmo_dir} lens bin {l} source bin {s}")
+                print(f"Running shear {cat_dir} lens bin {l} source bin {s}")
             config = ridge_analysis.ShearConfig(**config, **shear_config)
             ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
@@ -224,6 +229,24 @@ def main(action):
     
     step.main(comm)
 
+def fiducial(action):
+    from mpi4py.MPI import COMM_WORLD as comm
+    input_dir = "/pscratch/sd/z/zuntz/ridges/fiducial"
+    output_dir = "/pscratch/sd/z/zuntz/ridges/fiducial"
+    permutations = list(range(32))
+    if action == "ridges":
+        step = RidgesStep(permutations)
+    elif action == "segment":
+        step = SegmentationStep(permutations)
+    elif action == "shear":
+        step = ShearStep(permutations)
+        step.base_seed = 44789
+        step.cat_dir = input_dir
+    else:
+        raise ValueError("Unknown action " + action)
+
+    for permutation in range(32):
+        step.run(task_index, input_dir, output_dir, permutation, comm)
 
 
 parser = argparse.ArgumentParser()
