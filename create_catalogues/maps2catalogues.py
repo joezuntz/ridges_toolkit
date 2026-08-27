@@ -406,7 +406,7 @@ def run_on_fiducial_cosmogrid():
     size = comm.size
 
     base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/fiducial/cosmo_fiducial"
-    output_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/catalogs"
+    output_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/catalogs/"
     gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
     log_failures = False
