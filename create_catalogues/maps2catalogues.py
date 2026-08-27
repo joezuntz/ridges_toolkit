@@ -398,12 +398,54 @@ def main(cosmogrid_filename, gold_mask_filename, output_dir, prefix="", do_densi
     end_time = time.time()
     log(f'Total time taken: {(end_time - start_time)/60:.2f} minutes')
 
+
+def run_on_fiducial_cosmogrid():
+    do_density = True
+    from mpi4py.MPI import COMM_WORLD as comm
+    rank = comm.rank
+    size = comm.size
+
+    base_dir = "/global/cfs/cdirs/des/cosmogrid/processed/v11desy3/CosmoGrid/bary/fiducial/cosmo_fiducial"
+    output_base_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/catalogs"
+    gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
+
+    log_failures = False
+    max_permutations = 32
+
+    for i, permutation in enumerate(range(max_permutations)):
+        perm_dir = f"perm_{permutation:04d}"
+        if i % size != rank:
+            continue
+
+        # construct all the file paths we need
+        cosmogrid_file = f"{base_dir}/{perm_dir}/projected_probes_maps_v11dmb.h5"
+
+
+        marker_file = os.path.join(output_dir, f"complete.{permutation}")
+        # skip if the completion marker is already done.
+        if os.path.exists(marker_file):
+            print(f"Rank {rank} skipping permutation {permutation}")
+            continue
+        print(f"Rank {rank} running permutation {permutation}")
+        t0 = timer()
+        # we don't want to have too many directories so we collect
+        # the different permutations together in the same directory
+        prefix = perm_dir + "_"
+
+        # Try running the main function, but if something goes wrong, log it to the file
+        main(cosmogrid_file, gold_mask_filename, output_base_dir, prefix=prefix, do_density=do_density)
+        # when all has completed, add a marker file to the output dir
+        # so we know this permutation is done
+        open(marker_file, "w").close()
+        t1 = timer()
+        print(f"Rank {rank} Completed permutation {permutation} in {t1-t0:.1f} seconds")
+
 def run_on_full_cosmogrid():
     # suppress printing in the rest of the code
     global VERBOSE
     VERBOSE = False
     # temporary!
-    do_density = False
+    do_density = True
 
     # set up MPI processors
     from mpi4py.MPI import COMM_WORLD as comm
