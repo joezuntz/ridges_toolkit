@@ -247,8 +247,13 @@ def fiducial(action):
 
     # this is used only for the random seeds:
     task_index = 8778
-    for permutation in range(32):
-        step.run(task_index, input_dir, output_dir, permutation, comm)
+    if action == "segment":
+        for permutation in range(32):
+            if permutation % comm.size == comm.rank:
+                step.run(task_index, input_dir, output_dir, permutation, comm)    
+    else:
+        for permutation in range(32):
+            step.run(task_index, input_dir, output_dir, permutation, comm)
 
 
 parser = argparse.ArgumentParser()
