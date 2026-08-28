@@ -231,23 +231,30 @@ def main(action):
 
 def fiducial(action):
     from mpi4py.MPI import COMM_WORLD as comm
-    input_dir = "/pscratch/sd/z/zuntz/ridges/fiducial"
-    output_dir = "/pscratch/sd/z/zuntz/ridges/fiducial"
+    base_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/"
     permutations = list(range(32))
     if action == "ridges":
+        input_dir = base_dir + "catalogs"
+        output_dir = base_dir + "ridge_points"
         step = RidgesStep(permutations)
     elif action == "segment":
+        input_dir = base_dir + "ridge_points"
+        output_dir = base_dir + "ridges"
         step = SegmentationStep(permutations)
     elif action == "shear":
+        input_dir = base_dir + "ridges"
+        output_dir = base_dir + "shear"
+        step.cat_dir = "base_dir + "catalogs"
         step = ShearStep(permutations)
         step.base_seed = 44789
-        step.cat_dir = input_dir
     elif action == "noisy-shear":
+        input_dir = base_dir + "ridges"
+        output_dir = base_dir + "noisy-shear"
         shear_config['add_sigma_e'] = 0.26
         step = ShearStep(permutations)
-	step.base_seed = 447890
-	step.cat_dir = input_dir
-        output_dir = output_dir + "/noise/1"
+        step.base_seed = 447890
+        step.cat_dir = input_dir
+        output_dir = output_dir + "/noise/"
     else:
         raise ValueError("Unknown action " + action)
 

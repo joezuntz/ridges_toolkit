@@ -410,7 +410,7 @@ def run_on_fiducial_cosmogrid():
     gold_mask_filename = f"/pscratch/sd/z/zuntz/ridges/v1/desy3_gold_mask.npy"
 
     log_failures = False
-    max_permutations = 32
+    max_permutations = 1000
 
     for i, permutation in enumerate(range(max_permutations)):
         perm_dir = f"perm_{permutation:04d}"
