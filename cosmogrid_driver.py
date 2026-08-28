@@ -242,6 +242,12 @@ def fiducial(action):
         step = ShearStep(permutations)
         step.base_seed = 44789
         step.cat_dir = input_dir
+    elif action == "noisy-shear":
+        shear_config['add_sigma_e'] = 0.26
+        step = ShearStep(permutations)
+	step.base_seed = 447890
+	step.cat_dir = input_dir
+        output_dir = output_dir + "/noise/1"
     else:
         raise ValueError("Unknown action " + action)
 
