@@ -80,6 +80,22 @@ class AnalysisStep:
     def run(self, task_index, input_dir, output_dir, comm):
         pass
 
+    def check_and_run(self, task_index, input_dir, output_dir, perm, comm):
+        # Check we can do this task and it's not done already
+        marker_file = self.marker_file_check(input_dir, output_dir, perm)
+        if marker_file is None:
+            continue
+
+        # Run the actual main task
+        start_time = default_timer()
+        self.run(task_index, input_dir, output_dir, perm, comm)
+
+        time_taken = default_timer() - start_time
+        print(f"{self.__class__.__name__} took {time_taken:.1f} seconds")
+
+        # mark this one as done
+        open(marker_file, "w").close()
+
     def main(self, comm):
         cosmo_dirs = sorted(glob.glob("cosmo_*", root_dir=self.input_base))
         # split the whole collection of cosmo_dirs
@@ -101,21 +117,7 @@ class AnalysisStep:
                 input_dir = os.path.join(self.input_base, cosmo_dir)
                 output_dir = os.path.join(self.output_base, cosmo_dir)
 
-                # Check we can do this task and it's not done already
-                marker_file = self.marker_file_check(input_dir, output_dir, perm)
-                if marker_file is None:
-                    continue
-
-                # Run the actual main task
-                start_time = default_timer()
-                self.run(i, input_dir, output_dir, perm, comm)
-
-                time_taken = default_timer() - start_time
-                print(f"{self.__class__.__name__} took {time_taken:.1f} seconds")
-
-                # mark this one as done
-                open(marker_file, "w").close()
-
+                self.check_and_run(i, input_dir, output_dir, perm, comm)
 
     def marker_file_check(self, input_dir, output_dir, permutation):
         # check for a marker saying the input data
@@ -272,11 +274,11 @@ def fiducial(action):
         # rank is working.
         for permutation in range(FIDUCIAL_PERMUTATIONS):
             if permutation % comm.size == comm.rank:
-                step.run(task_index, input_dir, output_dir, permutation, comm)    
+                step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
     else:
         # The other steps are cooperative and the comm is acutally used
         for permutation in range(FIDUCIAL_PERMUTATIONS):
-            step.run(task_index, input_dir, output_dir, permutation, comm)
+            step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
 
 
 parser = argparse.ArgumentParser()
