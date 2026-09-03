@@ -250,7 +250,7 @@ def fiducial(action):
     elif action == "shear":
         input_dir = base_dir + "ridges/"
         output_dir = base_dir + "shear/"
-        step.cat_dir = "base_dir + "catalogs"
+        step.cat_dir = base_dir + "catalogs/"
         step = ShearStep(permutations)
         step.base_seed = 44789
     elif action == "noisy-shear":
