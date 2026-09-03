@@ -13,6 +13,7 @@ base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
 ADD_NOISE = False
+FIDUCIAL_PERMUTATIONS = 1000
 
 # The way I have installed mpi will not work on NERSC unless
 # you are running all on the same node.  If we want to run on
@@ -232,24 +233,27 @@ def main(action):
 def fiducial(action):
     from mpi4py.MPI import COMM_WORLD as comm
     base_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/"
-    permutations = list(range(32))
+    # This is not actually used because we are skipping
+    # the main method in the classes in favour of just
+    # manyally looping through permutations.
+    permutations = None
     if action == "ridges":
-        input_dir = base_dir + "catalogs"
-        output_dir = base_dir + "ridge_points"
+        input_dir = base_dir + "catalogs/"
+        output_dir = base_dir + "ridge_points/"
         step = RidgesStep(permutations)
     elif action == "segment":
-        input_dir = base_dir + "ridge_points"
-        output_dir = base_dir + "ridges"
+        input_dir = base_dir + "ridge_points/"
+        output_dir = base_dir + "ridges/"
         step = SegmentationStep(permutations)
     elif action == "shear":
-        input_dir = base_dir + "ridges"
-        output_dir = base_dir + "shear"
+        input_dir = base_dir + "ridges/"
+        output_dir = base_dir + "shear/"
         step.cat_dir = "base_dir + "catalogs"
         step = ShearStep(permutations)
         step.base_seed = 44789
     elif action == "noisy-shear":
-        input_dir = base_dir + "ridges"
-        output_dir = base_dir + "noisy-shear"
+        input_dir = base_dir + "ridges/"
+        output_dir = base_dir + "noisy-shear/"
         shear_config['add_sigma_e'] = 0.26
         step = ShearStep(permutations)
         step.base_seed = 447890
@@ -261,11 +265,17 @@ def fiducial(action):
     # this is used only for the random seeds:
     task_index = 8778
     if action == "segment":
-        for permutation in range(32):
+        # The segmentation steps is embarassingly parallel
+        # and the different procs do their own permutations.
+        # Although we pass comm to the run method that's only
+        # for consistency and it's only used to print out which
+        # rank is working.
+        for permutation in range(FIDUCIAL_PERMUTATIONS):
             if permutation % comm.size == comm.rank:
                 step.run(task_index, input_dir, output_dir, permutation, comm)    
     else:
-        for permutation in range(32):
+        # The other steps are cooperative and the comm is acutally used
+        for permutation in range(FIDUCIAL_PERMUTATIONS):
             step.run(task_index, input_dir, output_dir, permutation, comm)
 
 
