@@ -84,7 +84,7 @@ class AnalysisStep:
         # Check we can do this task and it's not done already
         marker_file = self.marker_file_check(input_dir, output_dir, perm)
         if marker_file is None:
-            continue
+            return
 
         # Run the actual main task
         start_time = default_timer()
