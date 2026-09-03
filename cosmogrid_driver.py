@@ -285,9 +285,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("action", type=str, default="ridges", help="Action to perform: ridges, segment, shear")
 parser.add_argument("--group", type=int, default=0, help="Index if doing multiple runs")
 parser.add_argument("--num-groups", type=int, default=1, help="Num groups if doing multiple node runs")
+parser.add_argument("--fiducial", action="store_true", default=False, help="Run on fid sims")
 
 if __name__ == "__main__":
     args = parser.parse_args()
     group = args.group
     num_groups = args.num_groups
-    main(args.action)
+    if args.fiducial:
+        fiducial(args.action)
+    else:
+        main(args.action)
