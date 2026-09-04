@@ -13,14 +13,14 @@ import load_data
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 PARAMETER_ORDER = [
-    'Omega_m',
     'bary_Mc',
     'bary_nu',
+    'H0',
+    'Omega_b',
+    'Omega_m',
+    'n_s',
     'sigma8',
     'w0',
-    'n_s',
-    'Omega_b',
-    'H0',
 ]
 
 
@@ -64,7 +64,7 @@ def make_prediction(params_dict, lens_bin, source_bin, model_path=None):
     model = keras.models.load_model(model_path, compile=False)
 
     # make prediction 
-    predict = model.predict(cosmology, verbose=2)
+    predict = model.predict(cosmology, verbose=0)
     predict = load_data.de_standardise_data(predict, Y_mean, Y_std)
     return predict
 
