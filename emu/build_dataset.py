@@ -9,14 +9,20 @@ import json
 import tqdm
 import numpy as np
 
+# main_folder = os.path.dirname(os.path.abspath(__file__))
+main_folder = '/home/s2561233/Documents/lss/ridges/ridges_toolkit/'
+os.chdir(main_folder)
 
-def write_dataset(file_path, cosmology, g_plus_data, g_cross_data):
+
+def write_dataset(file_path, param_names, cosmology, g_plus_data, g_cross_data, shape_noise):
     with h5py.File(file_path, 'w') as f:
+        f.create_dataset('param_names', data=np.array(param_names, dtype='S'))
         f.create_dataset('cosmology', data=cosmology)
         f.create_dataset('sep_bin_center', data=radius)
         for (l, s) in shear_lens_source_pairs_to_do:
             f.create_dataset(f'g_plus/lens_{l}_source_{s}', data=g_plus_data[:, l, s, :])
             f.create_dataset(f'g_cross/lens_{l}_source_{s}', data=g_cross_data[:, l, s, :])
+            f.create_dataset(f'shape_noise/lens_{l}_source_{s}', data=shape_noise[:, l, s, :])
 
 
 # import fiducial dataset
@@ -33,6 +39,8 @@ param_names = np.array(fiducials_dataset.dtype.names)[:14]
 underlying_varying_params = ['bary_Mc', 'bary_nu', 'H0', 'Ob', 'Om', 'ns', 's8', 'w0']
 # get indicies corresponding to these parameters in param_names
 param_indices = [np.where(param_names == p)[0][0] for p in underlying_varying_params]
+# extract name of parameters from fiducials_dataset.dtype.names corresponding to param_indices
+fid_params_names = [fiducials_dataset.dtype.names[i] for i in param_indices]
 
 
 shear_folder = 'v2-shear/shear/'
@@ -40,6 +48,9 @@ nsims = 2500
 radial_bins = 20
 source_bins = 4
 lens_bins = 4
+
+sigma_e = 0.26
+
 # save some simulations for testing the emulator
 n_tests = 50
 
@@ -73,6 +84,14 @@ g_cross_arr = np.zeros((nsims,
                         lens_bins,
                         source_bins,
                         radial_bins))
+shape_noise_arr = np.zeros((nsims,
+                            lens_bins,
+                            source_bins,
+                            radial_bins))
+counts_arr = np.zeros((nsims,
+                       lens_bins,
+                       source_bins,
+                       radial_bins))
 
 # remove dataset.hdf5 file if already exists
 if os.path.exists('emu/data/dataset.hdf5'):
@@ -99,12 +118,16 @@ for sim_folder in tqdm.tqdm(sim_folders, total=min(len(sim_folders), nsims), des
                     continue
                 
                 shear_file = 'perm_0000_shear_lens' + str(l) + '_source' + str(s) + '.txt'
-                radius, _, g_plus, g_cross, _, _ = np.genfromtxt(sim_folder/shear_file,
+                radius, _, g_plus, g_cross, counts, _ = np.genfromtxt(sim_folder/shear_file,
                                                                  unpack=True)
                 
                 # store shear signal g+ and gx
                 g_plus_arr[loop_count, l, s, :] = g_plus
                 g_cross_arr[loop_count, l, s, :] = g_cross
+                # calculate and save shape noise and couts
+                shape_noise_arr[loop_count, l, s, :] = sigma_e / np.sqrt(counts)
+                counts_arr[loop_count, l, s, :] = counts
+
         loop_count += 1
         # update values if key already exists in metadata.js metadata = {} only once
         if not radius_saved:
@@ -122,6 +145,31 @@ param_values_arr = param_values_arr[indices]
 param_values_arr = param_values_arr[:, param_indices]
 g_plus_arr = g_plus_arr[indices]
 g_cross_arr = g_cross_arr[indices]
+shape_noise_arr = shape_noise_arr[indices]
 
-write_dataset('emu/data/test_dataset.hdf5', param_values_arr[:n_tests], g_plus_arr[:n_tests], g_cross_arr[:n_tests])
-write_dataset('emu/data/dataset.hdf5', param_values_arr[n_tests:], g_plus_arr[n_tests:], g_cross_arr[n_tests:])
+write_dataset('emu/data/test_dataset.hdf5',
+              fid_params_names,
+              param_values_arr[:n_tests],
+              g_plus_arr[:n_tests],
+              g_cross_arr[:n_tests],
+              shape_noise_arr[:n_tests])
+write_dataset('emu/data/dataset.hdf5',
+              fid_params_names,
+              param_values_arr[n_tests:],
+              g_plus_arr[n_tests:],
+              g_cross_arr[n_tests:],
+              shape_noise_arr[n_tests:])
+
+# save counts into txt file, will be used for some testing when making predictions
+# NOTE: find a nicer way to do this
+with open('emu/data/counts.txt', 'w') as f:
+    f.write('# simulation_id lens_bin source_bin counts(sep_bin_center)')
+    # 4 columns: nsim | lens bin | source bin | counts 
+    for i in range(n_tests):
+        for s in range(source_bins):
+            for l in range(lens_bins):
+                # check if bin pair is in the list of pairs to do
+                if (l, s) not in shear_lens_source_pairs_to_do:
+                    continue
+                counts_str = ' '.join(map(str, counts_arr[i, l, s, :]))
+                f.write(f'\n{indices[i]} {l} {s} {counts_str}')
