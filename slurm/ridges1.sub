@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --qos=regular
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
+#SBATCH --account=m1727
+#SBATCH --constraint=cpu
+#SBATCH --job-name=desy3-rerun
+#SBATCH --output=desy3-rerun.log
+#SBATCH --mail-type=END
+
+# You can create this environment as described in the readme.
+module load python
+conda activate ./env
+
+export OMP_PROC_BIND=true
+export OMP_PLACES=threads
+export OMP_NUM_THREADS=2
+mpirun -n 64 python -c 'import create_catalogues.maps2catalogues as m;m.run_on_full_cosmogrid()'

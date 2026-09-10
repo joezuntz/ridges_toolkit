@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --qos=regular
+#SBATCH --time=18:00:00
+#SBATCH --nodes=1
+#SBATCH --account=des
+#SBATCH --constraint=cpu
+#SBATCH --job-name=fid4-noisy
+#SBATCH --output=fid4-noisy.log
+
+
+# You can create this environment as described in the readme.
+module load python
+conda activate ./env
+
+
+export OMP_PROC_BIND=true
+export OMP_PLACES=threads
+export OMP_NUM_THREADS=1
+mpirun -n 128 python cosmogrid_driver.py noisy-shear --fiducial --num-groups=4 --group=$1 &> fid4-noisy.$1.log

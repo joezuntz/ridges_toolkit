@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --qos=regular
+#SBATCH --time=2:00:00
+#SBATCH --nodes=1
+#SBATCH --account=m1727
+#SBATCH --constraint=cpu
+#SBATCH --job-name=fid3
+#SBATCH --output=fid3.log
+#SBATCH --mail-type=END
+
+# You can create this environment as described in the readme.
+module load python
+conda activate ./env
+
+export OMP_PROC_BIND=true
+export OMP_PLACES=threads
+export OMP_NUM_THREADS=2
+mpirun -n 64 python cosmogrid_driver.py segment --fiducial
