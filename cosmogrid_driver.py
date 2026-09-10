@@ -12,7 +12,7 @@ base_ridge_segment_dir = os.path.join(base_dir, "segments")
 base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
-ADD_NOISE = False
+ADD_NOISE = True
 FIDUCIAL_PERMUTATIONS = 1000
 
 # The way I have installed mpi will not work on NERSC unless
@@ -213,7 +213,7 @@ class ShearStep(AnalysisStep):
                 "seed": [base_seed, task_index, permutation, l, s],
             }
             if comm is None or comm.rank == 0:
-                print(f"Running shear {cat_dir} lens bin {l} source bin {s}")
+                print(f"Running shear of {config['source_catalog_file']} around  {config['ridge_file']} -> {config['output_shear_file']}")
             config = ridge_analysis.ShearConfig(**config, **shear_config)
             ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
@@ -250,8 +250,8 @@ def fiducial(action):
     elif action == "shear":
         input_dir = base_dir + "ridges/"
         output_dir = base_dir + "shear/"
-        step.cat_dir = base_dir + "catalogs/"
         step = ShearStep(permutations)
+        step.cat_dir = base_dir + "catalogs/" 
         step.base_seed = 44789
     elif action == "noisy-shear":
         input_dir = base_dir + "ridges/"
@@ -259,8 +259,7 @@ def fiducial(action):
         shear_config['add_sigma_e'] = 0.26
         step = ShearStep(permutations)
         step.base_seed = 447890
-        step.cat_dir = input_dir
-        output_dir = output_dir + "/noise/"
+        step.cat_dir = base_dir + "catalogs/"
     else:
         raise ValueError("Unknown action " + action)
 
@@ -278,7 +277,8 @@ def fiducial(action):
     else:
         # The other steps are cooperative and the comm is acutally used
         for permutation in range(FIDUCIAL_PERMUTATIONS):
-            step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
+            if permutation % num_groups == group:
+                step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
 
 
 parser = argparse.ArgumentParser()
