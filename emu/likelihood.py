@@ -13,7 +13,7 @@ PARAMETER_ORDER = [
     'bary_nu',
     'sigma8',
     'w0',
-    'n_s',
+    'ns',
     'Omega_b',
     'H0',
 ]
@@ -22,7 +22,7 @@ COSMOGRID_RANGES = {
     'Omega_m': {'lower_wide': 0.1,  'upper_wide': 0.5,   'lower_narrow': 0.15,  'upper_narrow': 0.45},
     'sigma8':  {'lower_wide': 0.4,  'upper_wide': 1.4,   'lower_narrow': 0.5,   'upper_narrow': 1.3},
     'w0':      {'lower_wide': -2.,  'upper_wide': -0.33, 'lower_narrow': -1.25, 'upper_narrow': -0.75},
-    'n_s':     {'lower_wide': 0.87, 'upper_wide': 1.07,  'lower_narrow': 0.93,  'upper_narrow': 1.},
+    'ns':     {'lower_wide': 0.87, 'upper_wide': 1.07,  'lower_narrow': 0.93,  'upper_narrow': 1.},
     'Omega_b': {'lower_wide': 0.03, 'upper_wide': 0.06,  'lower_narrow': 0.04,  'upper_narrow': 0.05},
     'H0':      {'lower_wide': 64.,  'upper_wide': 82.,   'lower_narrow': 65.,   'upper_narrow': 75.},
     # NOTE: I made up the the following two parameter ranges!!! Look for the actual ones

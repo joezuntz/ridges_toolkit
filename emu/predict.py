@@ -18,7 +18,7 @@ PARAMETER_ORDER = [
     'H0',
     'Omega_b',
     'Omega_m',
-    'n_s',
+    'ns',
     'sigma8',
     'w0',
 ]

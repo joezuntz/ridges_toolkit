@@ -14,11 +14,11 @@ main_folder = '/home/s2561233/Documents/lss/ridges/ridges_toolkit/'
 os.chdir(main_folder)
 
 
-def write_dataset(file_path, param_names, cosmology, g_plus_data, g_cross_data, shape_noise):
+def write_dataset(file_path, param_names, cosmology, sep_bin, g_plus_data, g_cross_data, shape_noise):
     with h5py.File(file_path, 'w') as f:
         f.create_dataset('param_names', data=np.array(param_names, dtype='S'))
         f.create_dataset('cosmology', data=cosmology)
-        f.create_dataset('sep_bin_center', data=radius)
+        f.create_dataset('sep_bin_center', data=sep_bin)
         for (l, s) in shear_lens_source_pairs_to_do:
             f.create_dataset(f'g_plus/lens_{l}_source_{s}', data=g_plus_data[:, l, s, :])
             f.create_dataset(f'g_cross/lens_{l}_source_{s}', data=g_cross_data[:, l, s, :])
@@ -75,6 +75,7 @@ with open('emu/data/metadata.json', 'w') as f:
         json.dump(metadata, f, indent=4)
         
 # create empty arrays to store signal and parameters
+sep_bin_arr = np.zeros((nsims, radial_bins))
 param_values_arr = np.zeros((nsims, len(param_names)))
 g_plus_arr = np.zeros((nsims,
                        lens_bins,
@@ -121,12 +122,14 @@ for sim_folder in tqdm.tqdm(sim_folders, total=min(len(sim_folders), nsims), des
                 radius, _, g_plus, g_cross, counts, _ = np.genfromtxt(sim_folder/shear_file,
                                                                  unpack=True)
                 
-                # store shear signal g+ and gx
+                # store radius, shear signal g+ and gx
+                sep_bin_arr[loop_count, :] = radius
                 g_plus_arr[loop_count, l, s, :] = g_plus
                 g_cross_arr[loop_count, l, s, :] = g_cross
                 # calculate and save shape noise and couts
                 shape_noise_arr[loop_count, l, s, :] = sigma_e / np.sqrt(counts)
                 counts_arr[loop_count, l, s, :] = counts
+
 
         loop_count += 1
         # update values if key already exists in metadata.js metadata = {} only once
@@ -143,6 +146,7 @@ np.random.shuffle(indices)
 # save only parameters with varying values, and the corresponding shear signals
 param_values_arr = param_values_arr[indices]
 param_values_arr = param_values_arr[:, param_indices]
+sep_bin_arr = sep_bin_arr[indices]
 g_plus_arr = g_plus_arr[indices]
 g_cross_arr = g_cross_arr[indices]
 shape_noise_arr = shape_noise_arr[indices]
@@ -150,12 +154,14 @@ shape_noise_arr = shape_noise_arr[indices]
 write_dataset('emu/data/test_dataset.hdf5',
               fid_params_names,
               param_values_arr[:n_tests],
+              sep_bin_arr[:n_tests],
               g_plus_arr[:n_tests],
               g_cross_arr[:n_tests],
               shape_noise_arr[:n_tests])
 write_dataset('emu/data/dataset.hdf5',
               fid_params_names,
               param_values_arr[n_tests:],
+              sep_bin_arr[n_tests:],
               g_plus_arr[n_tests:],
               g_cross_arr[n_tests:],
               shape_noise_arr[n_tests:])

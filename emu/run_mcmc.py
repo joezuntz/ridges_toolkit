@@ -49,8 +49,8 @@ def get_log_likelihood(params):
 
 
 def get_header(params_dict):
-    # NOTE: finish this
-    header = ''
+    # write parameter names (free)
+    header = f'# {params_dict.keys} log_w   log_l'
     return header
 
 
