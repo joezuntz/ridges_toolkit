@@ -1,4 +1,8 @@
 import os
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+
 import sys
 import time
 import numpy as np
@@ -13,7 +17,7 @@ import likelihood
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 Like = likelihood.Likelihood('emu/config_files/config_data.yaml')
-
+print(f"Fixed parameters: {Like.fixed_params}")
 
 def initialize_prior(config_file):
     with open(config_file, 'r') as f:
@@ -50,21 +54,21 @@ def get_log_likelihood(params):
 
 def get_header(params_dict):
     # write parameter names (free)
-    header = f'# {params_dict.keys} log_w   log_l'
+    header = f'#   log_w   log_l'
     return header
 
 
 def main():  
     prior = initialize_prior(Like.config_file)
-
-    filename = 'test_run2'
+    
+    filename = 'test_x'
     header = get_header(Like.config_file)
 
     sampler = Sampler(
         prior,
         get_log_likelihood,
         filepath=f'emu/chains/hdf5/{filename}.hdf5',
-        resume=True,
+        resume=False,
         n_live=1000,
         pool=1
         )

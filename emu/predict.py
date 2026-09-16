@@ -8,6 +8,12 @@ import numpy as np
 import os 
 import sys
 
+# Predictions do not require an interactive Qt backend.  Select a headless
+# backend before importing Keras (which may import matplotlib).
+os.environ.setdefault('MPLBACKEND', 'Agg')
+
+import keras
+
 import load_data
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
