@@ -3,7 +3,7 @@ from matplotlib import rc
 import numpy as np
 import json
 
-rc('text', usetex=False)
+rc('text', usetex=True)
 rc('font',**{'family':'serif','serif':['Times']})
 
 def plot_prediction_frac_error(xarr, 
