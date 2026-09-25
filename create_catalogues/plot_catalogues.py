@@ -7,6 +7,16 @@ import os
 
 folder = os.path.dirname(os.path.abspath(__file__))+'/data/catalogues/' 
 
+N = 6
+
+from matplotlib.colors import Normalize, LinearSegmentedColormap
+from matplotlib.cm import ScalarMappable
+my_cmap = LinearSegmentedColormap.from_list("", ["#B8E9FF","#0D5475"])
+
+from matplotlib import rc
+rc('text', usetex=True)
+rc('font',**{'family':'serif','serif':['Times']})
+
 def plot_dg_catalogue(catalogue, nside=1024, title='', lon=[0,10], lat=[0,10], chunk_size=2_000_000, save_name=''):
     npix = hp.nside2npix(nside)
     counts = np.zeros(npix, dtype=np.int64)
@@ -29,11 +39,29 @@ def plot_dg_catalogue(catalogue, nside=1024, title='', lon=[0,10], lat=[0,10], c
             pix = hp.ang2pix(nside, theta, phi)
             counts += np.bincount(pix, minlength=npix)
 
+            # # Mark pixels with no catalogue objects as unseen rather than plotting them
+            # # as zero-count pixels.
+            # counts = counts.astype(float)
+            # counts[counts == 0] = hp.UNSEEN
+
     fig = plt.figure(figsize=(14, 5))
-    hp.mollview(counts, fig=fig.number, sub=(1, 2, 1), title='', cmap='viridis')
+    hp.mollview(counts,
+        fig=fig.number,
+        sub=(1, 2, 1),
+        title='',
+        cmap='GnBu',
+        badcolor='lightgrey',)
+
     ax1 = plt.gca()
     ax1.set_position([0.05, 0.15, 0.60, 0.70])
-    hp.cartview(counts, fig=fig.number, sub=(1, 2, 2), title='', cmap='viridis', lonra=lon, latra=lat)
+    hp.cartview(counts,
+        fig=fig.number,
+        sub=(1, 2, 2),
+        title='',
+        cmap='GnBu',
+        badcolor='lightgrey',
+        lonra=lon,
+        latra=lat)
     ax2 = plt.gca()
     ax2.set_position([0.72, 0.22, 0.22, 0.45])
 
@@ -56,7 +84,7 @@ def plot_dg_catalogue(catalogue, nside=1024, title='', lon=[0,10], lat=[0,10], c
     plt.tight_layout()
     fig.suptitle(title)
     # plt.show()
-    plt.savefig(folder+'../../figs/dg_catalogue'+save_name+'.png')
+    plt.savefig(folder+'../../figs/dg_catalogue'+save_name+'.pdf')
 
 
 
@@ -89,15 +117,34 @@ def plot_shear_catalogue(catalogue, nside, title='', lon=[0,50], lat=[0,50], chu
     gamma1_map_rec[mask] /= counts[mask]
     gamma2_map_rec[mask] /= counts[mask]
     
-    fig = plt.figure(figsize=(12, 5))
+    fig = plt.figure(figsize=(8, 4))
+    
     # set masked pixels to hp.UNSEEN
     gamma1_map_rec[~mask] = hp.UNSEEN
     gamma2_map_rec[~mask] = hp.UNSEEN
-    hp.cartview(gamma1_map_rec, fig=fig.number, sub=(1, 2, 1), title='', cmap=plt.cm.viridis, lonra=lon, latra=lat)
-    hp.cartview(gamma2_map_rec, fig=fig.number, sub=(1, 2, 2), title='', cmap=plt.cm.viridis, lonra=lon, latra=lat)
-    fig.suptitle(title)
-    # plt.show()
-    plt.savefig(folder+'../../figs/reconstructed_shear_map'+save_name+'.png')
+
+    hp.cartview(gamma1_map_rec,
+        fig=fig.number,
+        sub=(1, 2, 1),
+        title='',
+        cmap='GnBu',
+        badcolor='lightgrey',
+        lonra=lon,
+        latra=lat,
+        unit=r'$\gamma_1$')
+    hp.cartview(gamma2_map_rec,
+        fig=fig.number,
+        sub=(1, 2, 2),
+        title='',
+        cmap='GnBu',
+        badcolor='lightgrey',
+        lonra=lon,
+        latra=lat,
+        unit=r'$\gamma_2$')
+
+    # fig.suptitle(title)
+    fig.tight_layout()
+    plt.savefig(folder+'../../figs/reconstructed_shear_map'+save_name+'.pdf',)
 
 
 

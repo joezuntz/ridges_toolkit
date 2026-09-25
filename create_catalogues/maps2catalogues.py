@@ -486,7 +486,7 @@ def run_on_full_cosmogrid():
 
 
 if __name__ == "__main__":
-    cosmogrid_filename = './data/projected_probes_maps_v11dmb.h5'
-    gold_mask_filename = './data/desy3_gold_mask.npy'
-    output_dir = './data/catalogues/'
+    cosmogrid_filename = './create_catalogues/data/projected_probes_maps_v11dmb.h5'
+    gold_mask_filename = './create_catalogues/data/desy3_gold_mask.npy'
+    output_dir = './create_catalogues/data/catalogues/'
     main(cosmogrid_filename, gold_mask_filename, output_dir)
