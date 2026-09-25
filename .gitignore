@@ -3,3 +3,8 @@ create_catalogues/data/
 create_catalogues/figs/
 example/
 emu/models/
+emu/data/test_dataset.hdf5
+emu/data/dataset.hdf5
+emu/figs/thesis
+emu/figs/*.pdf
+emu/figs*.png
