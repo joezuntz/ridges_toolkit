@@ -16,8 +16,23 @@ import likelihood
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-Like = likelihood.Likelihood('emu/config_files/config_data.yaml')
-print(f"Fixed parameters: {Like.fixed_params}")
+Like = None
+
+def get_likelihood():
+    global Like
+    if Like is None:
+        Like = likelihood.Likelihood("emu/config_files/config_data.yaml")
+    return Like
+
+
+def get_log_likelihood(params):
+    like = get_likelihood()
+    param_dic = dict(like.fixed_params)
+    param_dic.update(params)
+
+    loglike = like.compute_diag_likelihood(param_dic)
+    return loglike if np.isfinite(loglike) else -np.inf
+
 
 def initialize_prior(config_file):
     with open(config_file, 'r') as f:
@@ -41,44 +56,45 @@ def initialize_prior(config_file):
     return prior
 
 
-def get_log_likelihood(params):
-    param_dic = params | Like.fixed_params
+# def get_log_likelihood(params):
+#     param_dic = params | Like.fixed_params
 
-    loglike = Like.compute_diag_likelihood(param_dic)
+#     loglike = Like.compute_diag_likelihood(param_dic)
 
-    if not np.isfinite(loglike):
-        return -np.inf
+#     if not np.isfinite(loglike):
+#         return -np.inf
 
-    return loglike
+#     return loglike
 
 
 def get_header(params_dict):
     # write parameter names (free)
-    header = f'#   log_w   log_l'
+    header = f'# Omega_m sigma8 w0 ns Omega_b H0  log_w  log_l'
     return header
 
 
 def main():  
-    prior = initialize_prior(Like.config_file)
-    
-    filename = 'test_x'
-    header = get_header(Like.config_file)
+    prior = initialize_prior("emu/config_files/config_data.yaml")
 
-    sampler = Sampler(
-        prior,
-        get_log_likelihood,
-        filepath=f'emu/chains/hdf5/{filename}.hdf5',
-        resume=False,
-        n_live=1000,
-        pool=1
+    filename = 'test_x'
+    header = get_header("emu/config_files/config_data.yaml")
+
+    n_processes = 4  # start conservatively; do not use every logical CPU
+    context = multiprocessing.get_context("spawn")
+
+    with context.Pool(processes=n_processes) as pool:
+        sampler = Sampler(
+            prior,
+            get_log_likelihood,
+            filepath=f"emu/chains/hdf5/{filename}.hdf5",
+            resume=False,
+            n_live=1000,
+            pool=pool,
         )
+        start = time.time()
+        sampler.run(verbose=True, discard_exploration=True, n_eff=5000)
     
-    start = time.time()
-    sampler.run(
-        verbose=True,
-        discard_exploration=True,
-        n_eff=5000
-        )
+
     
     log_z = sampler.evidence()
     points, log_w, log_l = sampler.posterior()

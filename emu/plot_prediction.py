@@ -73,7 +73,7 @@ def plot_prediction_shapenoise(xarr,
                                s=0,
                                idx1=0, idx2=None, 
                                legend=None, 
-                               xlabel='', ylabel='', 
+                               xlabel='', ylabel='', ylabel_residuals='',
                                title='', 
                                fontsize=13, 
                                save=False, 
@@ -94,11 +94,11 @@ def plot_prediction_shapenoise(xarr,
     else:
         f = ax0.figure
 
-    ax0.plot(xarr, true_signal[idx1]*1e3, linestyle='solid', linewidth=2, color="#87dec4ff", label=legend[0])
-    ax0.plot(xarr, predicted_signal[idx1]*1e3, linestyle='dashed', linewidth=2, color="#15664eff")
+    ax0.plot(xarr, true_signal[idx1]*1e3, linestyle='solid', linewidth=2, color="#99D4E5", label=legend[0])  # 87dec4ff
+    ax0.plot(xarr, predicted_signal[idx1]*1e3, linestyle='dashed', linewidth=2, color="#18698F")  # 15664eff
     if idx2!=None:
-        ax0.plot(xarr, true_signal[idx2]*1e3, linestyle='solid', linewidth=2, color="#ffcc9cff", label=legend[1])
-        ax0.plot(xarr, predicted_signal[idx2]*1e3, linestyle='dashed', linewidth=2, color="#ff7b00ff")
+        ax0.plot(xarr, true_signal[idx2]*1e3, linestyle='solid', linewidth=2, color="#ACD56D", label=legend[1])  # ffcc9cff
+        ax0.plot(xarr, predicted_signal[idx2]*1e3, linestyle='dashed', linewidth=2, color="#3a8257")  # ff7b00ff
     
     ax0.set_xscale('log')
     ax0.set_ylabel(ylabel, fontsize=fontsize)
@@ -114,21 +114,23 @@ def plot_prediction_shapenoise(xarr,
     ax1.plot(xarr, (predicted_signal[idx1] - true_signal[idx1]) / shape_noise[idx1][pair_idx], 
              linestyle='solid', 
              linewidth=2, 
-             color="#15664eff", 
+             color="#18698F", 
              label='fractional error')
     
     if idx2!=None:
         ax1.plot(xarr, (predicted_signal[idx2] - true_signal[idx2]) / shape_noise[idx2][pair_idx], 
                  linestyle='solid', 
                  linewidth=2, 
-                 color="#ff7b00ff", 
+                 color="#3a8257", 
                  label='fractional error')
-    
+
+    ax1.fill_between([0., 1e2], -0.1, 0.1, color='gray', alpha=0.2)
+
     ax1.set_xscale('log')
     ax1.set_xlabel(xlabel, fontsize=fontsize)
-    plt.ylabel(r'$\sigma_e/\sqrt{N}$')  # --> stdev
+    plt.ylabel(ylabel_residuals, fontsize=fontsize)  # --> stdev
     ax1.tick_params(axis='both', which='major', labelsize=fontsize) 
-    # ax1.set_ylim(-0.1, 0.1)
+    ax1.set_xlim(xarr[0]-0.1, xarr[-1]+0.1)
 
     f.tight_layout()
     if save:
@@ -137,3 +139,4 @@ def plot_prediction_shapenoise(xarr,
         plt.show()
 
     return f, (ax0, ax1)
+

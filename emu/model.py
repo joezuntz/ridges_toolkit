@@ -12,13 +12,16 @@ from keras.optimizers import Adam
 
 def diagonal_chi2_loss(n_theta):
     def loss(y_true_with_sigma, y_pred):
+        # y contains both signal and shape noise, so we first split them
         y_true = y_true_with_sigma[:, :n_theta]
-        sigma = y_true_with_sigma[:, n_theta:]
+        y_sigma = y_true_with_sigma[:, n_theta:]
 
-        sigma = tf.maximum(sigma, 1e-8)
-        z = (y_pred - y_true) / sigma
+        # avoid uncertainty to become too small
+        y_sigma = tf.maximum(y_sigma, 1e-8)
+        # standardize
+        residual_in_sigma = (y_pred - y_true) / y_sigma
 
-        return tf.reduce_mean(tf.square(z), axis=-1)
+        return tf.reduce_mean(tf.square(residual_in_sigma), axis=-1)
 
     return loss
 

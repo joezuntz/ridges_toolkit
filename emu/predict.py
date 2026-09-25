@@ -30,6 +30,13 @@ PARAMETER_ORDER = [
 ]
 
 
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def _load_model(model_path):
+    return keras.models.load_model(model_path, compile=False)
+
+
 def make_prediction(params_dict, lens_bin, source_bin, model_path=None):
     """
     Use emulator to predict tangencial shear signal given cosmology and lens/source bins.
@@ -67,7 +74,8 @@ def make_prediction(params_dict, lens_bin, source_bin, model_path=None):
     # load trained model.keras from file 
     if model_path==None:
         model_path = f'emu/models/lens{lens_bin}_source{source_bin}.keras'
-    model = keras.models.load_model(model_path, compile=False)
+    # model = keras.models.load_model(model_path, compile=False)
+    model = _load_model(model_path)
 
     # make prediction 
     predict = model.predict(cosmology, verbose=0)

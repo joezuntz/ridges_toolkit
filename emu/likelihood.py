@@ -6,6 +6,8 @@ import predict
 
 
 SIGMA_E = 0.26
+NPERM = 1000
+FOLDER = 'fiducial-shear-noisy/fiducial/noisy-shear/'
 
 PARAMETER_ORDER = [
     'Omega_m',
@@ -22,7 +24,7 @@ COSMOGRID_RANGES = {
     'Omega_m': {'lower_wide': 0.1,  'upper_wide': 0.5,   'lower_narrow': 0.15,  'upper_narrow': 0.45},
     'sigma8':  {'lower_wide': 0.4,  'upper_wide': 1.4,   'lower_narrow': 0.5,   'upper_narrow': 1.3},
     'w0':      {'lower_wide': -2.,  'upper_wide': -0.33, 'lower_narrow': -1.25, 'upper_narrow': -0.75},
-    'ns':     {'lower_wide': 0.87, 'upper_wide': 1.07,  'lower_narrow': 0.93,  'upper_narrow': 1.},
+    'ns':      {'lower_wide': 0.87, 'upper_wide': 1.07,  'lower_narrow': 0.93,  'upper_narrow': 1.},
     'Omega_b': {'lower_wide': 0.03, 'upper_wide': 0.06,  'lower_narrow': 0.04,  'upper_narrow': 0.05},
     'H0':      {'lower_wide': 64.,  'upper_wide': 82.,   'lower_narrow': 65.,   'upper_narrow': 75.},
     # NOTE: I made up the the following two parameter ranges!!! Look for the actual ones
@@ -41,7 +43,8 @@ class Likelihood():
         self.bin_pairs = self.load_bin_pairs('emu/data/metadata.json')
         self.fiducials = self.load_fiducials(self.config_file)
         self.data_vector = self.compute_data_vector()
-        self.variance = self.compute_covariance()
+        self.variance = self.compute_diagonal_covariance()
+        self.full_cov = self.compute_full_covariance()
 
     
     def load_fiducials(self, fids_file):
@@ -69,6 +72,13 @@ class Likelihood():
         return metadata['bin_pairs']
 
 
+    def read_data(self, loc, nperm, bin_lens, bin_source):
+        file = loc + f'perm_{nperm}_shear_lens{bin_lens}_source{bin_source}.txt'
+        # print(file)
+        sep_bin_center, weighted_sep, g_plus, g_cross, counts, weights = np.genfromtxt(file, unpack=True)
+        return sep_bin_center, g_plus, g_cross, counts
+
+
     def compute_data_vector(self):
         for i, (l, s) in enumerate(self.bin_pairs):
             prediction = predict.make_prediction(self.fiducials, l, s)
@@ -83,7 +93,7 @@ class Likelihood():
         return data_vector.flatten()
 
 
-    def compute_covariance(self):
+    def compute_diagonal_covariance(self):
         """
         Compute the covariance matrix for the data vector. For now, we assume 
         a diagonal covariance matrix. The diagonal elements are given by the 
@@ -98,6 +108,35 @@ class Likelihood():
             variance.append(shot_noise.flatten())
 
         return np.concatenate(variance)
+
+
+    def compute_full_covariance(self):
+        signal = np.zeros((NPERM, len(self.bin_pairs), 20))
+        shot_noise = np.zeros((len(self.bin_pairs), 20))
+
+        for i, (l, s) in enumerate(self.bin_pairs):
+            for p in range(NPERM):
+                # make per number foru digits (eg. 1 --> 0001)
+                p_str = str(p).zfill(4)
+                sep_bin_center, g_plus, g_cross, counts = self.read_data(FOLDER, p_str, l, s)
+                signal[p, i, :] = g_plus
+                shot_noise[i, :] = SIGMA_E / np.sqrt(counts) 
+
+        # each bin pair has 20 theta points
+        cov_size = len(sep_bin_center) * len(self.bin_pairs)
+        cov = np.zeros((cov_size, cov_size))
+
+        # flatten each permutation into one vector [(bin0,theta0), (bin0,theta1), ...]
+        signal_flat = signal.reshape(NPERM, cov_size)
+
+        # realisation covariance (diagonal and off diagonal)
+        cov = np.cov(signal_flat, rowvar=False, ddof=1)
+
+        # add shape noise variance only on diagonal
+        shape_variance = shot_noise.flatten() ** 2
+        cov[np.diag_indices_from(cov)] += shape_variance
+
+        return cov
 
     
     def compute_flatten_prediction(self, params_dict):
@@ -176,6 +215,26 @@ class Likelihood():
             return -np.inf
 
 
+    def compute_fullcov_likelihood(self, params_dict):
+        are_params_within_ranges = self.check_param_ranges(params_dict)
+
+        if are_params_within_ranges:
+            model = self.compute_flatten_prediction(params_dict)
+
+            residuals = self.data_vector - model 
+            inv_cov = np.linalg.inv(self.full_cov)
+
+            # Anderson-Hartlapp correction
+            bias_factor = NPERM / NPERM - inv_cov.shape[0] - 1
+            correct_inv_cov = bias_factor * inv_cov
+            
+            chi2 = residuals @ correct_inv_cov @ residuals
+
+            return -0.5*chi2 
+        else:
+            return -np.inf
+        
+
     def test_one_likelihood_iteration(self, params_dict):
         """
         Test the likelihood calculation for a single set of parameters.
@@ -190,5 +249,7 @@ class Likelihood():
         Loglikelihood (-0.5*chi2) or -inf if the parameters are outside the emulator range
         """
         loglike = self.compute_diag_likelihood(params_dict)
+        print(f"logL with full cov: {self.compute_fullcov_likelihood(params_dict)}")
+
         return loglike
 
