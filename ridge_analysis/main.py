@@ -18,7 +18,7 @@ def locate_ridge_points(dredge_config: DredgeConfig, comm) -> RidgePointCatalog:
     # each rank only the lens catalog nearby its mesh points, but for now we
     # just load the whole catalog on every rank.
     lens_catalog = LensCatalog(dredge_config.lens_catalog_file)
-    lens_catalog.load(comm=comm, split_over_ranks=False)
+    lens_catalog.load(comm=comm, split_over_ranks=False, group=dredge_config.lens_catalog_group)
 
     # Apply any redshift cuts
     need_zmin = (dredge_config.lens_zmin is not None) and (dredge_config.lens_zmin != 0)
@@ -93,8 +93,7 @@ def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmen
         # filament_segments is a list of graphs.
         filament_labels = segment_filaments_with_dbscan(ridges,
                                                         filament_segments, 
-                                                        eps=segmentation_config.epsilon,
-                                                        min_samples=segmentation_config.min_samples)
+                                                        eps=segmentation_config.epsilon,zmin_samples=segmentation_config.min_samples)
         n_filament = len(filament_labels)
         #filament labels is now a list of indices.
 

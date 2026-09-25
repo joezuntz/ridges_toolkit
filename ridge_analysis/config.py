@@ -21,6 +21,7 @@ class Config:
 @dataclasses.dataclass(kw_only=True)
 class DredgeConfig:
     lens_catalog_file: str
+    lens_catalog_group: str = "/"
     ridge_point_file: str
     checkpoint_dir: str
     bandwidth: float = 6.0  # in arcmin
