@@ -67,9 +67,31 @@ def initialize_prior(config_file):
 #     return loglike
 
 
-def get_header(params_dict):
-    # write parameter names (free)
-    header = f'# Omega_m sigma8 w0 ns Omega_b H0  log_w  log_l'
+
+def get_header(config_file):
+    with open(config_file, 'r') as f:
+        params_dict = yaml.safe_load(f)
+
+    prior_lines = "# Priors:\n"
+    fids_lines = "# Fiducials:\n"
+    for par_i in params_dict:
+        fid_value = params_dict[par_i]['fid']
+        fids_lines += f"# {par_i}: {fid_value}\n"
+
+        if params_dict[par_i]['type']=='G':
+            param_mean = params_dict[par_i]['mean']
+            param_std = params_dict[par_i]['std']
+            prior_lines += f"# {par_i}: (mean={param_mean}, std={param_std})\n"
+            
+        elif params_dict[par_i]['type']=='U':
+            lower_lim = params_dict[par_i]['low']
+            upper_lim = params_dict[par_i]['upp']
+            prior_lines += f"# {par_i}: [{lower_lim}, {upper_lim}]\n"    
+
+    param_names = list(params_dict.keys())
+    last_line_header = '# ' + '   '.join(param_names) + '   log_w   log_l'
+
+    header = fids_lines + "\n" + prior_lines + "\n" + last_line_header
     return header
 
 
