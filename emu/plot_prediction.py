@@ -78,7 +78,9 @@ def plot_prediction_shapenoise(xarr,
                                fontsize=13, 
                                save=False, 
                                savename='', 
-                               ax0=None, ax1=None):
+                               ax0=None, ax1=None,
+                               noise_true=None
+                               ):
     if legend is None:
         legend = []
 
@@ -99,6 +101,9 @@ def plot_prediction_shapenoise(xarr,
     if idx2!=None:
         ax0.plot(xarr, true_signal[idx2]*1e3, linestyle='solid', linewidth=2, color="#ACD56D", label=legend[1])  # ffcc9cff
         ax0.plot(xarr, predicted_signal[idx2]*1e3, linestyle='dashed', linewidth=2, color="#3a8257")  # ff7b00ff
+
+    if noise_true is not None:
+        ax0.fill_between(x=xarr, y1=(true_signal[idx1] - shape_noise[idx1][pair_idx])*1e3, y2=(true_signal[idx1] + shape_noise[idx1][pair_idx])*1e3, alpha=0.3, color='#99D4E5')
     
     ax0.set_xscale('log')
     ax0.set_ylabel(ylabel, fontsize=fontsize)
