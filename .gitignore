@@ -2,3 +2,15 @@
 create_catalogues/data/
 create_catalogues/figs/
 example/
+emu/models/
+emu/chains/
+emu/data/test_dataset.hdf5
+emu/data/dataset.hdf5
+emu/data/counts.txt
+emu/data/metadata.json
+emu/figs/thesis
+emu/figs/offline
+test_rerun
+v1-shear
+v2-shear
+fiducial-shear-noisy/

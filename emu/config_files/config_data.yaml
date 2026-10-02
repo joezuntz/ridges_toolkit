@@ -1,0 +1,49 @@
+### Fiducials and priors
+
+Omega_m:
+    type: 'U'
+    fid: 0.31
+    low: 0.2
+    upp: 0.4
+
+bary_Mc:
+    type: 'F'
+    fid: 13.82
+    # low:
+    # upp:
+
+bary_nu:
+    type: 'F'
+    fid: 0.
+    # low:
+    # upp:
+
+sigma8:
+    type: 'U'
+    fid: 0.83
+    low: 0.5
+    upp: 1.3
+
+w0:
+    type: 'U'
+    fid: -1.
+    low: -1.25
+    upp: -0.75
+
+ns:
+    type: 'U'
+    fid: 0.97
+    low: 0.93
+    upp: 1.00
+
+Omega_b:
+    type: 'U'
+    fid: 0.045
+    low: 0.04
+    upp: 0.05
+
+H0:
+    type: 'U'
+    fid: 68.
+    low: 65.
+    upp: 75.
