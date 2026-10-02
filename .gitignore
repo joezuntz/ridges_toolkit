@@ -5,6 +5,7 @@ example/
 emu/models/
 emu/data/test_dataset.hdf5
 emu/data/dataset.hdf5
+emu/data/counts.txt
+emu/data/metadata.json
 emu/figs/thesis
-emu/figs/*.pdf
-emu/figs/*.png
+emu/figs/offline
