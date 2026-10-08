@@ -93,7 +93,8 @@ def segment_ridges(segmentation_config: SegmentationConfig, comm) -> RidgeSegmen
         # filament_segments is a list of graphs.
         filament_labels = segment_filaments_with_dbscan(ridges,
                                                         filament_segments, 
-                                                        eps=segmentation_config.epsilon,zmin_samples=segmentation_config.min_samples)
+                                                        eps=segmentation_config.epsilon,
+                                                        min_samples=segmentation_config.min_samples)
         n_filament = len(filament_labels)
         #filament labels is now a list of indices.
 
