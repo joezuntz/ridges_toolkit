@@ -1,6 +1,6 @@
 ### Fiducials and priors
 'Omega_m': 0.31
-'bary_Mc': 13.82
+'bary_Mc': 13.8
 'bary_nu': 0.
 'sigma8':  0.83
 'w0':      -1.
@@ -8,3 +8,4 @@
 'Omega_b': 0.045
 'H0':      68.
 'S8':      0.8437199377360555
+'log10As': 3.0175042954447653

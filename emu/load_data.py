@@ -12,11 +12,11 @@ from sklearn.model_selection import train_test_split
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def load_dataset(lens_bin, source_bin):
+def load_dataset(lens_bin, source_bin, h5_dataset='emu/data/dataset.hdf5'):
     '''
     Load cosmology, signal and relative error (shape noise) from dataset.hdf5
     '''
-    with h5py.File('emu/data/dataset.hdf5') as f:
+    with h5py.File(h5_dataset) as f:
         X = f["cosmology"][:]
         Y = f["g_plus/lens_"+str(lens_bin)+"_source_"+str(source_bin)][:]
         shape_noise = f["shape_noise/lens_"+str(lens_bin)+"_source_"+str(source_bin)][:]
