@@ -79,10 +79,15 @@ def plot_prediction_shapenoise(xarr,
                                save=False, 
                                savename='', 
                                ax0=None, ax1=None,
-                               noise_true=None
+                               noise_true=None,
+                               colors=None
                                ):
     if legend is None:
         legend = []
+
+    if colors is None:
+        colors = [['#99D4E5', '#ACD56D'],
+                  ['#18698F', '#3a8257']]
 
     # get index corresponding to (l,s) from metadata    
     with open('emu/data/metadata.json', 'r') as f:
@@ -96,11 +101,11 @@ def plot_prediction_shapenoise(xarr,
     else:
         f = ax0.figure
 
-    ax0.plot(xarr, true_signal[idx1]*1e3, linestyle='solid', linewidth=2, color="#99D4E5", label=legend[0])  # 87dec4ff
-    ax0.plot(xarr, predicted_signal[idx1]*1e3, linestyle='dashed', linewidth=2, color="#18698F")  # 15664eff
+    ax0.plot(xarr, true_signal[idx1]*1e3, linestyle='solid', linewidth=2, color=colors[0][0])  # 87dec4ff
+    ax0.plot(xarr, predicted_signal[idx1]*1e3, linestyle='dashed', linewidth=2, color=colors[1][0], label=legend[0])  # 15664eff
     if idx2!=None:
-        ax0.plot(xarr, true_signal[idx2]*1e3, linestyle='solid', linewidth=2, color="#ACD56D", label=legend[1])  # ffcc9cff
-        ax0.plot(xarr, predicted_signal[idx2]*1e3, linestyle='dashed', linewidth=2, color="#3a8257")  # ff7b00ff
+        ax0.plot(xarr, true_signal[idx2]*1e3, linestyle='solid', linewidth=2, color=colors[0][1])  # ffcc9cff
+        ax0.plot(xarr, predicted_signal[idx2]*1e3, linestyle='dashed', linewidth=2, color=colors[1][1], label=legend[1])  # ff7b00ff
 
     if noise_true is not None:
         ax0.fill_between(x=xarr, y1=(true_signal[idx1] - shape_noise[idx1][pair_idx])*1e3, y2=(true_signal[idx1] + shape_noise[idx1][pair_idx])*1e3, alpha=0.3, color='#99D4E5')
@@ -119,14 +124,14 @@ def plot_prediction_shapenoise(xarr,
     ax1.plot(xarr, (predicted_signal[idx1] - true_signal[idx1]) / shape_noise[idx1][pair_idx], 
              linestyle='solid', 
              linewidth=2, 
-             color="#18698F", 
+             color=colors[1][0], 
              label='fractional error')
     
     if idx2!=None:
         ax1.plot(xarr, (predicted_signal[idx2] - true_signal[idx2]) / shape_noise[idx2][pair_idx], 
                  linestyle='solid', 
                  linewidth=2, 
-                 color="#3a8257", 
+                 color=colors[1][1], 
                  label='fractional error')
 
     ax1.fill_between([0., 1e2], -0.1, 0.1, color='gray', alpha=0.2)

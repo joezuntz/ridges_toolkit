@@ -2,6 +2,7 @@
 # Train and save emulator
 # ---------------------- #
 import numpy as np
+import tensorflow as tf
 
 import model 
 import load_data
@@ -9,6 +10,7 @@ import load_data
 import pickle
 import json
 import os
+import argparse
 
 # folder_path = '/home/s2561233/Documents/lss/ridges/ridges_toolkit'
 # # change working directory to folder_path
@@ -17,7 +19,7 @@ import os
 METADATA = "emu/data/metadata.json"
 
 
-def train_emulator(lens_bin, source_bin):    
+def train_emulator(lens_bin, source_bin, model_folder="emu/models"):
     X_train, X_validate, Y_train, Y_validate, \
         shape_noise_train, shape_noise_validate = load_data.process_data(lens_bin, source_bin)
 
@@ -38,6 +40,7 @@ def train_emulator(lens_bin, source_bin):
          n_nodes=128, 
          learning_rate=5e-5
     )
+    callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
     history = nn_model.fit(
          X_train,
          Y_train_for_loss,
@@ -55,21 +58,24 @@ def train_emulator(lens_bin, source_bin):
     return history
 
 
-def train_all_bin_pairs(metadata_file):
+def train_all_bin_pairs(metadata_file, model_folder="emu/models"):
     with open(metadata_file, "r") as f:
         metadata = json.load(f)
     all_pairs = metadata["bin_pairs"]
     for (l,s) in all_pairs:
         print("TRAINING PAIR:", (l, s))
-        train_emulator(l, s)
+        train_emulator(l, s, model_folder)
 
 
 
 def main():
-    train_all_bin_pairs(METADATA)
+    parser = argparse.ArgumentParser(description='Train emulator models.')
+    parser.add_argument('-mf', '--modelfolder', default='emu/models',
+        help='Folder where trained models and histories are saved (default: emu/models)')
+    args = parser.parse_args()
+    train_all_bin_pairs(METADATA, args.modelfolder)
 
 if __name__ == "__main__":
     main()
-
 
 
