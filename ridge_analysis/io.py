@@ -49,7 +49,7 @@ class Catalog:
             for key, value in self.metadata.items():
                 f.attrs[key] = value
 
-    def load(self, comm=None, split_over_ranks=True, reload=False):
+    def load(self, comm=None, split_over_ranks=True, reload=False, group="/"):
         if self.loaded and not reload:
             return
         # If we are splitting over ranks, we want every rank to read its own chunk of the data.
@@ -58,7 +58,7 @@ class Catalog:
             rank = comm.rank
             size = comm.size
             with h5py.File(self.filename, "r") as f:
-                length = f[self.columns[0]].shape[0]
+                length = f[group][self.columns[0]].shape[0]
             rows = length // size
             if rank == size - 1:
                 my_rows = length - rows * (size - 1)
@@ -81,11 +81,11 @@ class Catalog:
         if (comm is None) or (comm.rank == 0) or split_over_ranks:
             with h5py.File(self.filename, "r") as f:
                 for col in self.columns:
-                    if col not in f and col not in self.optional_columns:
+                    if col not in f[group] and col not in self.optional_columns:
                         raise ValueError(f"Column {col} not found in file {self.filename}")
-                    elif col in f:
-                        self.data[col] = f[col][slc]
-                        if f[col].dtype == np.float32:
+                    elif col in f[group]:
+                        self.data[col] = f[group][col][slc]
+                        if f[group][col].dtype == np.float32:
                             self.data[col] = self.data[col].astype(np.float64)
 
         # In this case every process should get all the catalog

@@ -21,6 +21,7 @@ class Config:
 @dataclasses.dataclass(kw_only=True)
 class DredgeConfig:
     lens_catalog_file: str
+    lens_catalog_group: str = "/"
     ridge_point_file: str
     checkpoint_dir: str
     bandwidth: float = 6.0  # in arcmin
@@ -62,6 +63,8 @@ class SegmentationConfig:
     mst_neighbours: int = 10
     do_spline: bool = False
     n_spline_points: int = 100
+    epsilon: float = 0.02
+    min_samples: int = 5
 
     help = {
         "ridge_point_file": "Path to the input ridge point file (HDF5 format).",
@@ -69,7 +72,9 @@ class SegmentationConfig:
         "density_percentile": "Percentile threshold for density to filter ridge points (0-100).",
         "mst_neighbours": "Number of nearest neighbors to consider when building the minimum spanning tree for segmentation.",
         "do_spline": "Whether to perform spline interpolation on the segmented ridges.",
-        "spline_points": "Number of points to use for spline interpolation if do_spline is True."
+        "spline_points": "Number of points to use for spline interpolation if do_spline is True.",
+        "epsilon": "Size of core filament to find.",
+        "min_samples": "Min number of points needed in core of filament.",
     }   
 
 

@@ -45,16 +45,15 @@ def train_emulator(lens_bin, source_bin, model_folder="emu/models"):
          X_train,
          Y_train_for_loss,
          validation_data = (X_validate, Y_validate_for_loss),
-         epochs=70, 
-         batch_size=32,
-         callbacks = [callback]
+         epochs=50, 
+         batch_size=32
          )
 
-    # save the model (create the model directory if it doesn't exist)
-    os.makedirs(model_folder, exist_ok=True)
+    # save the model (create emu/models directory if it doesn't exist)
+    os.makedirs('emu/models', exist_ok=True)
     suffix = str(lens_bin)+'_source'+str(source_bin)
-    nn_model.save(os.path.join(model_folder, 'lens'+suffix+'.keras'))
-    with open(os.path.join(model_folder, 'traing_history'+suffix+'.pkl'), 'wb') as file:
+    nn_model.save('emu/models/lens'+suffix+'.keras')
+    with open('emu/models/traing_history'+suffix+'.pkl', 'wb') as file:
             pickle.dump(history.history, file)
     return history
 

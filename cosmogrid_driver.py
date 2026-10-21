@@ -5,14 +5,15 @@ import traceback
 from timeit import default_timer
 import argparse
 
-base_dir = "/pscratch/sd/z/zuntz/ridges/v1"
+base_dir = "/pscratch/sd/z/zuntz/ridges/v2"
 base_catalog_dir = os.path.join(base_dir, "catalogs")
 base_ridge_point_dir = os.path.join(base_dir, "ridges")
 base_ridge_segment_dir = os.path.join(base_dir, "segments")
 base_shear_dir = os.path.join(base_dir, "shear")
 
 MAP_NSIDE = 1024
-ADD_NOISE = False
+ADD_NOISE = True
+FIDUCIAL_PERMUTATIONS = 1000
 
 # The way I have installed mpi will not work on NERSC unless
 # you are running all on the same node.  If we want to run on
@@ -79,6 +80,22 @@ class AnalysisStep:
     def run(self, task_index, input_dir, output_dir, comm):
         pass
 
+    def check_and_run(self, task_index, input_dir, output_dir, perm, comm):
+        # Check we can do this task and it's not done already
+        marker_file = self.marker_file_check(input_dir, output_dir, perm)
+        if marker_file is None:
+            return
+
+        # Run the actual main task
+        start_time = default_timer()
+        self.run(task_index, input_dir, output_dir, perm, comm)
+
+        time_taken = default_timer() - start_time
+        print(f"{self.__class__.__name__} took {time_taken:.1f} seconds")
+
+        # mark this one as done
+        open(marker_file, "w").close()
+
     def main(self, comm):
         cosmo_dirs = sorted(glob.glob("cosmo_*", root_dir=self.input_base))
         # split the whole collection of cosmo_dirs
@@ -100,21 +117,7 @@ class AnalysisStep:
                 input_dir = os.path.join(self.input_base, cosmo_dir)
                 output_dir = os.path.join(self.output_base, cosmo_dir)
 
-                # Check we can do this task and it's not done already
-                marker_file = self.marker_file_check(input_dir, output_dir, perm)
-                if marker_file is None:
-                    continue
-
-                # Run the actual main task
-                start_time = default_timer()
-                self.run(i, input_dir, output_dir, perm, comm)
-
-                time_taken = default_timer() - start_time
-                print(f"{self.__class__.__name__} took {time_taken:.1f} seconds")
-
-                # mark this one as done
-                open(marker_file, "w").close()
-
+                self.check_and_run(i, input_dir, output_dir, perm, comm)
 
     def marker_file_check(self, input_dir, output_dir, permutation):
         # check for a marker saying the input data
@@ -186,13 +189,18 @@ class ShearStep(AnalysisStep):
     output_base = base_shear_dir
     catalog_base = base_catalog_dir
     uses_comm_internally = True
+    cat_dir = None
+    base_seed = 7876
+
 
     def run(self, task_index, input_dir, output_dir, permutation, comm):
-        cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
-
-        cat_dir = os.path.join(self.catalog_base, cosmo_dir)
+        if self.cat_dir is None:
+            cosmo_dir = input_dir.removeprefix(self.input_base).lstrip(os.path.sep)
+            cat_dir = os.path.join(self.catalog_base, cosmo_dir)
+        else:
+            cat_dir = self.cat_dir
         nside = MAP_NSIDE
-        base_seed = 7876
+        base_seed = self.base_seed
 
         if ADD_NOISE and ((comm is None) or (comm.rank == 0)):
             print("ADDING NOISE!")
@@ -205,7 +213,7 @@ class ShearStep(AnalysisStep):
                 "seed": [base_seed, task_index, permutation, l, s],
             }
             if comm is None or comm.rank == 0:
-                print(f"Running shear {cosmo_dir} lens bin {l} source bin {s}")
+                print(f"Running shear of {config['source_catalog_file']} around  {config['ridge_file']} -> {config['output_shear_file']}")
             config = ridge_analysis.ShearConfig(**config, **shear_config)
             ridge_analysis.measure_ridge_shear(config, comm=comm)
                 
@@ -224,15 +232,66 @@ def main(action):
     
     step.main(comm)
 
+def fiducial(action):
+    from mpi4py.MPI import COMM_WORLD as comm
+    base_dir = "/pscratch/sd/z/zuntz/ridges/fiducial/"
+    # This is not actually used because we are skipping
+    # the main method in the classes in favour of just
+    # manyally looping through permutations.
+    permutations = None
+    if action == "ridges":
+        input_dir = base_dir + "catalogs/"
+        output_dir = base_dir + "ridge_points/"
+        step = RidgesStep(permutations)
+    elif action == "segment":
+        input_dir = base_dir + "ridge_points/"
+        output_dir = base_dir + "ridges/"
+        step = SegmentationStep(permutations)
+    elif action == "shear":
+        input_dir = base_dir + "ridges/"
+        output_dir = base_dir + "shear/"
+        step = ShearStep(permutations)
+        step.cat_dir = base_dir + "catalogs/" 
+        step.base_seed = 44789
+    elif action == "noisy-shear":
+        input_dir = base_dir + "ridges/"
+        output_dir = base_dir + "noisy-shear/"
+        shear_config['add_sigma_e'] = 0.26
+        step = ShearStep(permutations)
+        step.base_seed = 447890
+        step.cat_dir = base_dir + "catalogs/"
+    else:
+        raise ValueError("Unknown action " + action)
+
+    # this is used only for the random seeds:
+    task_index = 8778
+    if action == "segment":
+        # The segmentation steps is embarassingly parallel
+        # and the different procs do their own permutations.
+        # Although we pass comm to the run method that's only
+        # for consistency and it's only used to print out which
+        # rank is working.
+        for permutation in range(FIDUCIAL_PERMUTATIONS):
+            if permutation % comm.size == comm.rank:
+                step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
+    else:
+        # The other steps are cooperative and the comm is acutally used
+        for permutation in range(FIDUCIAL_PERMUTATIONS):
+            if permutation % num_groups == group:
+                step.check_and_run(task_index, input_dir, output_dir, permutation, comm)
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("action", type=str, default="ridges", help="Action to perform: ridges, segment, shear")
 parser.add_argument("--group", type=int, default=0, help="Index if doing multiple runs")
 parser.add_argument("--num-groups", type=int, default=1, help="Num groups if doing multiple node runs")
+parser.add_argument("--fiducial", action="store_true", default=False, help="Run on fid sims")
 
 if __name__ == "__main__":
     args = parser.parse_args()
     group = args.group
     num_groups = args.num_groups
-    main(args.action)
+    if args.fiducial:
+        fiducial(args.action)
+    else:
+        main(args.action)
