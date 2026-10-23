@@ -1,4 +1,6 @@
-### Fiducials and priors
+### FIDUCIALS AND PRIORS
+# Comment out "low" and "upp" when fixing a parameter ("F").
+# Options: "G" for Gaussian and "U" for uniform prior.
 
 Omega_m:
     type: 'U'

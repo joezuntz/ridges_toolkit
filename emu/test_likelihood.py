@@ -5,7 +5,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-param_file = 'emu/config_files/config_data.yaml'
+param_file = 'emu/config_files/config.yaml'
 
 Like = likelihood.Likelihood(param_file)
 

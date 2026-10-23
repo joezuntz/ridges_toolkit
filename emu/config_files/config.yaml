@@ -1,0 +1,13 @@
+# Fiducials and priors file
+config_data: 'emu/config_files/config_data.yaml'
+
+# Scale cuts configuration
+scale_cuts: 
+    type: 'theta'
+    # theta --> angular separation
+    # ell --> multipoles
+    cut_list: [      3.45, 3.45, 3.45,
+                     3.45, 3.45, 3.45,
+                           3.45, 3.45,
+                                 3.45]
+    # position corresponds to bin pair index (check metadata.json for specifications)

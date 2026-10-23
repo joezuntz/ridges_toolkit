@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import yaml
+import warnings
 
 import predict
 
@@ -33,20 +34,43 @@ COSMOGRID_RANGES = {
 }
 
 
+
 class Likelihood():
     """
     Class to handle the theoretical predictions and likelihood calculations.
     """
 
-    def __init__(self, param_config_file='emu/data/config_data.yaml'):
-        self.config_file = param_config_file
-        self.bin_pairs = self.load_bin_pairs('emu/data/metadata.json')
+    def __init__(self, config_file='emu/data/config.yaml'):
+        self.config_file, theta_min_list = self.setup_config_file(config_file)
+        self.bin_pairs, self.sep_bin_center = self.load_info_metadata('emu/data/metadata.json')
         self.fiducials = self.load_fiducials(self.config_file)
+        theta_min_validated = self.validate_scale_cuts(theta_min_list)
+        self.mask_data_vector = self.crate_scale_cuts_mask(theta_min_validated)
+
         self.data_vector = self.compute_data_vector()
         self.variance = self.compute_diagonal_covariance()
         self.full_cov = self.compute_full_covariance()
 
-    
+
+    def setup_config_file(self, config_file):
+        """
+        Load config data file and scale cuts from config file (yaml)
+        """
+        with open(config_file, 'r') as f:
+            file = yaml.safe_load(f)
+        
+        config_file = file['config_data']
+        
+        if file['scale_cuts']['type'] == 'theta':
+            theta_min = file['scale_cuts']['cut_list']
+        elif file['scale_cuts']['type'] == 'ell':
+            theta_min = 180. / file['scale_cuts']['cut_list']
+        else:
+            raise KeyError("wrong scale cut type, choose 'theta' or 'ell'")
+
+        return config_file, theta_min
+
+
     def load_fiducials(self, fids_file):
         """
         Load fiducials and priors from a configuration file (yaml)
@@ -63,13 +87,54 @@ class Likelihood():
         return params_fiducial
 
 
-    def load_bin_pairs(self, metadata_file):
+    def load_info_metadata(self, metadata_file):
         """
         Load the bin pairs from metadata.json file.
         """
         with open(metadata_file, 'r') as f:
             metadata = json.load(f)
-        return metadata['bin_pairs']
+
+        return metadata['bin_pairs'], np.array(metadata['sep_bin_center'])
+
+
+    def validate_scale_cuts(self, theta_min_list):
+        """
+        Scale cut validation: check if the scale cuts are within the valid range 
+        and match the number of bin pairs.
+        """
+        val_min = self.sep_bin_center[0]
+        val_max = self.sep_bin_center[-1]
+
+        if any(val < val_min for val in theta_min_list):
+            warnings.warn(f'theta_min is smaller than {val_min}, no values masked.')   
+        elif any(val > val_max for val in theta_min_list):
+            warnings.warn(f'theta_min large than maximum theta \
+                          ({val_max}), this will mask all values.')
+        elif len(theta_min_list) != len(self.bin_pairs):
+            raise ValueError(f'Number of scale cuts ({len(theta_min_list)}) \
+                              does not match number of bin pairs ({len(self.bin_pairs)}).')
+        
+        return theta_min_list
+
+
+    def crate_scale_cuts_mask(self, theta_min):
+        """
+        Creates boolean mask for data vector and covariance matrix based on
+        input scale cut values (list).
+        """
+        mask_size = len(self.bin_pairs) * len(self.sep_bin_center)
+        mask_data_vector = np.ones(mask_size, dtype=bool)
+        mask_cov = np.ones((mask_size, mask_size), dtype=bool)
+
+        for i, (l, s) in enumerate(self.bin_pairs):
+            # create mask for this bin pair
+            mask = self.sep_bin_center >= theta_min[i]
+
+            # apply this bin pair's scale cut to the overall mask
+            start = i * len(mask)
+            mask_data_vector[start:start + len(mask)] = mask
+
+        return mask_data_vector
 
 
     def read_data(self, loc, nperm, bin_lens, bin_source):
@@ -88,9 +153,11 @@ class Likelihood():
                 data_vector = prediction
             else:
                 data_vector = np.concatenate((data_vector, prediction))
+        
+        data_vector = data_vector.flatten()
 
-        # return flattened data vector
-        return data_vector.flatten()
+        # returned flattened and masked data vector (scale cuts)
+        return data_vector[self.mask_data_vector]
 
 
     def compute_diagonal_covariance(self):
@@ -107,7 +174,8 @@ class Likelihood():
                                                 counts_file='emu/data/counts.txt')[i]
             variance.append(shot_noise.flatten())
 
-        return np.concatenate(variance)
+        # mask variance (scale cuts)
+        return np.concatenate(variance)[self.mask_data_vector]
 
 
     def compute_full_covariance(self):
@@ -116,7 +184,7 @@ class Likelihood():
 
         for i, (l, s) in enumerate(self.bin_pairs):
             for p in range(NPERM):
-                # make per number foru digits (eg. 1 --> 0001)
+                # make per number four digits (eg. 1 --> 0001)
                 p_str = str(p).zfill(4)
                 sep_bin_center, g_plus, g_cross, counts = self.read_data(FOLDER, p_str, l, s)
                 signal[p, i, :] = g_plus
@@ -136,7 +204,8 @@ class Likelihood():
         shape_variance = shot_noise.flatten() ** 2
         cov[np.diag_indices_from(cov)] += shape_variance
 
-        return cov
+        # return masked covariance (scale cuts)
+        return cov[np.ix_(self.mask_data_vector, self.mask_data_vector)]
 
     
     def compute_flatten_prediction(self, params_dict):
@@ -207,6 +276,9 @@ class Likelihood():
         if are_params_within_ranges:
             model = self.compute_flatten_prediction(params_dict)
 
+            # mask model (scale cuts)
+            model = model[self.mask_data_vector]
+
             residuals = self.data_vector - model 
             chi2 = np.sum((residuals**2) / self.variance)
 
@@ -220,6 +292,8 @@ class Likelihood():
 
         if are_params_within_ranges:
             model = self.compute_flatten_prediction(params_dict)
+            # mask model (scale cuts)
+            model = model[self.mask_data_vector]
 
             residuals = self.data_vector - model 
             inv_cov = np.linalg.inv(self.full_cov)

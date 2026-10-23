@@ -37,7 +37,7 @@ def train_emulator(lens_bin, source_bin, model_folder="emu/models"):
     nn_model = model.build_model(
          n_in=X_train.shape[1], 
          n_out=Y_train.shape[1], 
-         n_nodes=128, 
+         n_nodes=265, 
          learning_rate=5e-5
     )
     callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
@@ -46,7 +46,8 @@ def train_emulator(lens_bin, source_bin, model_folder="emu/models"):
          Y_train_for_loss,
          validation_data = (X_validate, Y_validate_for_loss),
          epochs=50, 
-         batch_size=32
+         batch_size=32,
+         callbacks=[callback]
          )
 
     # save the model (create emu/models directory if it doesn't exist)
