@@ -43,6 +43,9 @@ def build_model(n_in, n_out, n_nodes=128, learning_rate=5e-5):
     model.add(Dense(n_nodes, use_bias=use_bias))
     model.add(Activation(activation_type))
 
+    model.add(Dense(n_nodes, use_bias=use_bias))
+    model.add(Activation(activation_type))
+
     model.add(Dense(n_out, use_bias=use_bias))
     model.add(Activation('linear'))
 
